@@ -8,24 +8,24 @@
 #include <chrono>
 #include <utility>
 
-namespace QP
+namespace MehrotraQP
 {
 
-struct QP_settings
+struct Settings
 {
     double mu_term = 1e-3;
     double mu_feas = 1e0;
     double mu_max = 1e12;
     double mu_init = 1e7;
     double eps_feas = 1e-6;
-    unsigned int iter_max = 100;
+    int iter_max = 100;
     double gamma = 0.999;
     double t_ls = 0.9;
     bool preprocessing_enable = true;
     double T_max = 0;
 };
 
-struct QP_results
+struct Results
 {
     Eigen::VectorXd x;
     Eigen::VectorXd v;
@@ -33,24 +33,27 @@ struct QP_results
     Eigen::VectorXd s;
     double objective;
     bool converged;
-    unsigned int num_iter;
+    int num_iter;
     double sol_time;
     bool feas;
 };
 
-class QP_primal_dual
+class Solver
 {
+    public:
+
+        // constructor
+        Solver(const Eigen::SparseMatrix<double>& P,
+            const Eigen::VectorXd& q,
+            const Eigen::SparseMatrix<double>& A = Eigen::SparseMatrix<double>{},
+            const Eigen::VectorXd& b = Eigen::VectorXd{},
+            const Eigen::SparseMatrix<double>& G = Eigen::SparseMatrix<double>{},
+            const Eigen::VectorXd& w = Eigen::VectorXd{});
+
+        // solve method
+        Results solve();
+
     private:
-
-        // utilities
-        void inline getTripletsForMatrix(const Eigen::Ref<const Eigen::MatrixXd> mat, std::vector<Eigen::Triplet<double>> &tripvec,
-            int rowOffset, int colOffset);
-        void inline getTripletsForMatrix(const Eigen::SparseMatrix<double> * mat_ptr, std::vector<Eigen::Triplet<double>> &tripvec,
-            int rowOffset, int colOffset);
-        void inline getTripletsForMatrixDiagonal(const Eigen::Ref<const Eigen::VectorXd> d, std::vector<Eigen::Triplet<double>> &tripvec,
-            int rowOffset, int colOffset);
-
-    protected:
 
         // problem matrices / vectors
         Eigen::SparseMatrix<double> P;
@@ -84,9 +87,9 @@ class QP_primal_dual
         double mu;
 
         // problem dimensions
-        unsigned int n;
-        unsigned int m_ineq;
-        unsigned int m_eq;
+        int n;
+        int m_ineq;
+        int m_eq;
 
         // flags
         bool equalityConstrained;
@@ -94,7 +97,7 @@ class QP_primal_dual
         bool b_updated;
    
         // settings
-        QP_settings settings;
+        Settings settings;
 
         // helper methods
         double objective(const Eigen::Ref<const Eigen::VectorXd> x);
@@ -109,45 +112,6 @@ class QP_primal_dual
         double computeMu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u);
         void computeProblemDimensions();
         void initializeWorkingMatrices();
-
-    public:
-
-        // constructor
-        QP_primal_dual();
-        QP_primal_dual(const Eigen::SparseMatrix<double> &P,
-            const Eigen::VectorXd &q,
-            const Eigen::SparseMatrix<double> &A,
-            const Eigen::VectorXd &b,
-            const Eigen::SparseMatrix<double> &G,
-            const Eigen::VectorXd &w);
-
-        // destructor
-        ~QP_primal_dual();
-
-        // setup
-        void setup(const Eigen::SparseMatrix<double> &P,
-            const Eigen::VectorXd &q,
-            const Eigen::SparseMatrix<double> &A,
-            const Eigen::VectorXd &b,
-            const Eigen::SparseMatrix<double> &G,
-            const Eigen::VectorXd &w);
-
-        // set settings
-        void set_settings(const QP_settings *settings);
-
-        // set methods
-        void set_P(const Eigen::SparseMatrix<double> &P);
-        void set_q(const Eigen::VectorXd &q);
-        void set_A(const Eigen::SparseMatrix<double> &A);
-        void set_b(const Eigen::VectorXd &b);
-        void set_G(const Eigen::SparseMatrix<double> &G);
-        void set_w(const Eigen::VectorXd &w);
-        
-        // solve method
-        QP_results solve();
-
 };
 
 } // end namespace
-
-#endif

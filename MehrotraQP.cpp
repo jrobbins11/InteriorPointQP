@@ -1,5 +1,17 @@
 #include "QP_primal_dual.hpp"
 
+namespace 
+{
+    // utilities
+    void inline getTripletsForMatrix(const Eigen::Ref<const Eigen::MatrixXd> mat, std::vector<Eigen::Triplet<double>> &tripvec,
+        int rowOffset, int colOffset);
+    void inline getTripletsForMatrix(const Eigen::SparseMatrix<double> * mat_ptr, std::vector<Eigen::Triplet<double>> &tripvec,
+        int rowOffset, int colOffset);
+    void inline getTripletsForMatrixDiagonal(const Eigen::Ref<const Eigen::VectorXd> d, std::vector<Eigen::Triplet<double>> &tripvec,
+        int rowOffset, int colOffset);
+}
+
+
 // constructor
 QP_primal_dual::QP_primal_dual() {}
 
