@@ -37,20 +37,20 @@ namespace
 Solver::Solver(
     const Eigen::SparseMatrix<double>& P,
     const Eigen::VectorXd& q,
-    const Eigen::SparseMatrix<double>& A,
-    const Eigen::VectorXd& b,
     const Eigen::SparseMatrix<double>& G,
     const Eigen::VectorXd& w,
+    const Eigen::SparseMatrix<double>& A,
+    const Eigen::VectorXd& b,
     const Settings& settings 
 )
 {    
     // copy in data, check for default-constructed arguments
     P_ = P;
     q_ = q;
-    A_ = (A.rows() == 0) ? Eigen::SparseMatrix<double>(0, q.size()) : A;
-    b_ = b;
     G_ = (G.rows() == 0) ? Eigen::SparseMatrix<double>(0, q.size()) : G;
     w_ = w;
+    A_ = (A.rows() == 0) ? Eigen::SparseMatrix<double>(0, q.size()) : A;
+    b_ = b;
     settings_ = settings;    
 
     // preprocessing (make sure A is full rank)
@@ -199,8 +199,8 @@ Result Solver::solve()
     results.u = u;
     results.s = s;
     results.objective = objective(x);
-    results.feas = mu <= settings_.mu_feas; // divergence check
-    results.converged = !numerical_issue && (k < settings_.iter_max) && results.feas;
+    results.feasible = mu <= settings_.mu_feas; // divergence check
+    results.converged = !numerical_issue && (k < settings_.iter_max) && results.feasible;
     results.num_iter = k;
     results.sol_time = time;
 

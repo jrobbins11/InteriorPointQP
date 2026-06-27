@@ -34,7 +34,6 @@ endif()
 # source files
 set(SOURCE_FILES
     src/MehrotraQP.cpp
-    debug/debug.cpp # DEBUG
 )
 
 # build

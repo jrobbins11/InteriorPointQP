@@ -3,6 +3,7 @@
 #include "Eigen/Dense"
 #include "Eigen/Sparse"
 
+#include <ostream>
 #include <vector>
 #include <cmath>
 #include <utility>
@@ -15,8 +16,8 @@ struct Settings
 {
     double mu_term = 1e-3;
     double mu_feas = 1e0;
-    double mu_max = 1e12;
-    double mu_init = 1e7;
+    double mu_max = 1e20; // TODO: robustify infeasibility detection
+    double mu_init = 1e6;
     double eps_feas = 1e-6;
     int iter_max = 100;
     double gamma = 0.999;
@@ -35,7 +36,25 @@ struct Result
     bool converged;
     int num_iter;
     double sol_time;
-    bool feas;
+    bool feasible;
+
+    friend std::ostream& operator<<(std::ostream& os, const Result& result)
+    {
+        os << "MehrotraQP Result: " << std::endl;
+        if (result.x.size() < 10)
+        {
+            os << " x: " << result.x;
+            os << " v: " << result.v;
+            os << " u: " << result.u;
+            os << " s: " << result.s;
+        }
+        os << " objective: " << result.objective << std::endl;
+        os << " converged: " << result.converged << std::endl;
+        os << " num_iter: " << result.num_iter << std::endl;
+        os << " sol_time: " << result.sol_time << " s" << std::endl;
+        os << " feasible: " << result.feasible << std::endl;
+        return os;
+    }
 };
 
 class Solver
@@ -44,13 +63,15 @@ class Solver
 
         // constructor
         // TODO: handle unconstrained problems
+        // TODO: document what the variables mean
+        // TODO: require P positive semidef
         Solver(
             const Eigen::SparseMatrix<double>& P,
             const Eigen::VectorXd& q,
-            const Eigen::SparseMatrix<double>& A = Eigen::SparseMatrix<double>{},
-            const Eigen::VectorXd& b = Eigen::VectorXd{},
             const Eigen::SparseMatrix<double>& G = Eigen::SparseMatrix<double>{},
             const Eigen::VectorXd& w = Eigen::VectorXd{},
+            const Eigen::SparseMatrix<double>& A = Eigen::SparseMatrix<double>{},
+            const Eigen::VectorXd& b = Eigen::VectorXd{},
             const Settings& settings = Settings{}    
         );
 
