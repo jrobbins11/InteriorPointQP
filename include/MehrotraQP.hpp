@@ -43,6 +43,7 @@ class Solver
     public:
 
         // constructor
+        // TODO: handle unconstrained problems
         Solver(
             const Eigen::SparseMatrix<double>& P,
             const Eigen::VectorXd& q,

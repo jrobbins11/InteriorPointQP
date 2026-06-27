@@ -34,12 +34,11 @@ endif()
 # source files
 set(SOURCE_FILES
     src/MehrotraQP.cpp
+    debug/debug.cpp # DEBUG
 )
 
 # build
-add_library(${TARGET_VAR} STATIC
-        ${SOURCE_FILES}
-)
+add_library(${TARGET_VAR} STATIC ${SOURCE_FILES})
 
 # link dependencies
 target_link_libraries(${TARGET_VAR} PUBLIC Eigen3::Eigen)
