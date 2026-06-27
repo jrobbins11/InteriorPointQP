@@ -2,10 +2,9 @@
 
 #include "Eigen/Dense"
 #include "Eigen/Sparse"
+
 #include <vector>
-#include <string>
 #include <cmath>
-#include <chrono>
 #include <utility>
 
 namespace MehrotraQP
@@ -43,25 +42,30 @@ class Solver
     public:
 
         // constructor
-        Solver(const Eigen::SparseMatrix<double>& P,
+        Solver(
+            const Eigen::SparseMatrix<double>& P,
             const Eigen::VectorXd& q,
             const Eigen::SparseMatrix<double>& A = Eigen::SparseMatrix<double>{},
             const Eigen::VectorXd& b = Eigen::VectorXd{},
             const Eigen::SparseMatrix<double>& G = Eigen::SparseMatrix<double>{},
-            const Eigen::VectorXd& w = Eigen::VectorXd{});
+            const Eigen::VectorXd& w = Eigen::VectorXd{},
+            const Settings& settings = Settings{}    
+        );
 
         // solve method
         Results solve();
 
+        // update methods
+        void update_settings(const Settings& settings);
+
     private:
 
         // problem matrices / vectors
-        Eigen::SparseMatrix<double> P;
-        Eigen::VectorXd q;
-        Eigen::SparseMatrix<double> A, A_T;
-        Eigen::VectorXd b;
-        Eigen::SparseMatrix<double> G, G_T;
-        Eigen::VectorXd w;
+        Eigen::SparseMatrix<double> P_, A_, G_, A_T_, G_T_;
+        Eigen::VectorXd q_, b_, w_;
+
+        // settings
+        Settings settings_;
 
         // linear system
         Eigen::SparseMatrix<double> M, M0, dM;
@@ -87,17 +91,11 @@ class Solver
         double mu;
 
         // problem dimensions
-        int n;
-        int m_ineq;
-        int m_eq;
+        int n_, m_ineq_, m_eq_;
 
         // flags
-        bool equalityConstrained;
-        bool A_updated;
-        bool b_updated;
-   
-        // settings
-        Settings settings;
+        bool equalityConstrained_;
+        
 
         // helper methods
         double objective(const Eigen::Ref<const Eigen::VectorXd> x);
@@ -110,7 +108,7 @@ class Solver
         void makeValid_A();
         void makeValid_b();
         double computeMu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u);
-        void computeProblemDimensions();
+        bool computeProblemDimensions();
         void initializeWorkingMatrices();
 };
 
