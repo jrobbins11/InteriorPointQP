@@ -9,29 +9,9 @@ using namespace MehrotraQP;
 namespace 
 {
     // utilities
-    void getTripletsForMatrix(const Eigen::Ref<const Eigen::MatrixXd> mat, std::vector<Eigen::Triplet<double>> &tripvec,
-        int rowOffset, int colOffset)
-    {
-        int m = mat.rows();
-        int n_ = mat.cols();
-        for (int i=0; i<m; i++)
-        {
-            for (int j=0; j<n_; j++)
-            {
-                if (mat(i,j) != 0)
-                {
-                    tripvec.emplace_back(i+rowOffset, j+colOffset, mat(i,j));
-                }
-            }
-        }
-    }
-
     void getTripletsForMatrix(const Eigen::SparseMatrix<double> * mat_ptr, std::vector<Eigen::Triplet<double>> &tripvec,
         int rowOffset, int colOffset)
-    {
-        int m = mat_ptr->rows();
-        int n_ = mat_ptr->cols();
-        
+    {       
         for (int i=0; i<mat_ptr->outerSize(); i++)
         {
             for (typename Eigen::SparseMatrix<double>::InnerIterator it(*mat_ptr,i); it; ++it)
