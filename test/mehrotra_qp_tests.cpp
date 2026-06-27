@@ -11,6 +11,38 @@
 
 using namespace MehrotraQP;
 
+// test fixture
+class RandomQP : public ::testing::Test
+{
+protected:
+    void SetUp() override 
+    {
+        // init fields
+        distr = std::uniform_real_distribution<double>(1, 10.);
+
+        // random unconstrained QP
+        std::vector<Eigen::Triplet<double>> triplets;
+        q.resize(n);
+        for (int i=0; i<n; ++i) 
+        {
+            triplets.emplace_back(i, i, distr(gen));
+            q(i) = distr(gen);
+        }
+        P.resize(n, n);
+        P.setFromTriplets(triplets.begin(), triplets.end());
+    }
+
+    void TearDown() override
+    {
+    }
+
+    std::mt19937 gen {42};
+    std::uniform_real_distribution<double> distr;
+    const int n = 50;
+    Eigen::SparseMatrix<double> P;
+    Eigen::VectorXd q;
+};
+
 // Test that problem dimension checking works
 TEST(MehrotraQP, InvalidProblemDimensions)
 {
@@ -32,23 +64,10 @@ TEST(MehrotraQP, InvalidProblemDimensions)
 }
 
 // Check that perturbations around the optimal solution for a nearly unconstrained problem have higher cost than solver solution
-TEST(MehrotraQP, NearlyUnconstrainedOptimal)
+TEST_F(RandomQP, NearlyUnconstrainedOptimal)
 {
-    // random unconstrained QP
-    std::mt19937 gen (42);
-    std::uniform_real_distribution<double> distr(1., 10.);
-    const int n = 50;
-    std::vector<Eigen::Triplet<double>> triplets;
-    Eigen::VectorXd q = Eigen::VectorXd::Zero(n);
-    for (int i=0; i<n; ++i) 
-    {
-        triplets.emplace_back(i, i, distr(gen));
-        q(i) = distr(gen);
-    }
-    Eigen::SparseMatrix<double> P (n, n);
-    P.setFromTriplets(triplets.begin(), triplets.end());
-
     // do-nothing inequality constraints
+    std::vector<Eigen::Triplet<double>> triplets;
     triplets.clear();
     for (int i=0; i<n; ++i)
     {
@@ -117,4 +136,10 @@ TEST(MehrotraQP, UnconstrainedOptimal)
     {
         EXPECT_NEAR(result.x(i), q(i), 1e-6);
     }
+}
+
+// Infeasible problem produces infeasible solution
+TEST_F(RandomQP, InfeasibleProblem)
+{
+    // TODO
 }
