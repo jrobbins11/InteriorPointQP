@@ -30,7 +30,6 @@ namespace
     }
 
     // constants
-    constexpr double INFTY = std::numeric_limits<double>::infinity();
     constexpr double EPSILON = Eigen::NumTraits<double>::dummy_precision();
 }
 
@@ -75,7 +74,7 @@ void Solver::update_settings(const Settings& settings)
 }
 
 // solve
-Results Solver::solve()
+Result Solver::solve()
 {
     // declare
     double mu, h, mu_pred, sigma;
@@ -89,7 +88,6 @@ Results Solver::solve()
 
     // running timer
     double running_timer = 0; // init
-    const double T_max = (settings_.T_max > 0.0) ? settings_.T_max : INFTY;
 
     // initialize start vars
     x0 = Eigen::VectorXd::Zero(n_);
@@ -116,7 +114,7 @@ Results Solver::solve()
 
     // loop
     while ((mu > settings_.mu_term) && (k < settings_.iter_max) && 
-        !numerical_issue && (running_timer < T_max) && (mu <= settings_.mu_max))
+        !numerical_issue && (running_timer < settings_.T_max) && (mu <= settings_.mu_max))
     {
         // generate system matrix and decompose
         generateSystemMatrix();
@@ -195,7 +193,7 @@ Results Solver::solve()
     double time = 1e-6 * ((double) duration_final.count());
 
     // assemble results
-    Results results;
+    Result results;
     results.x = x;
     results.v = v;
     results.u = u;
@@ -215,9 +213,7 @@ Results Solver::solve()
 // objective function
 double Solver::objective(const Eigen::Ref<const Eigen::VectorXd> x_in)
 {
-    double J;
-    J = 0.5*x_in.dot(P_*x_in) + q_.dot(x_in);
-    return J;
+    return 0.5*x_in.dot(P_*x_in) + q_.dot(x_in);
 }
 
 // initialize working matrices
@@ -422,8 +418,10 @@ bool Solver::computeProblemDimensions()
     equalityConstrained_ = (m_eq_ == 0) ? false : true;
 
     // check validity
-    return n_ == q_.size() && n_ == P_.cols() && n_ == A_.cols() && n_ == G_.cols() 
+    const bool dims_consistent = n_ == q_.size() && n_ == P_.cols() && n_ == A_.cols() && n_ == G_.cols() 
         && m_eq_ == b_.size() && m_ineq_ == w_.size();
+    const bool dims_valid = n_ > 0 && m_eq_ >= 0 && m_ineq_ >= 0;
+    return dims_consistent && dims_valid;
 }
 
 void Solver::getValidEqualityConstraints()

@@ -6,6 +6,7 @@
 #include <vector>
 #include <cmath>
 #include <utility>
+#include <limits>
 
 namespace MehrotraQP
 {
@@ -21,10 +22,10 @@ struct Settings
     double gamma = 0.999;
     double t_ls = 0.9;
     bool preprocessing_enable = true;
-    double T_max = 0;
+    double T_max = std::numeric_limits<double>::infinity();
 };
 
-struct Results
+struct Result
 {
     Eigen::VectorXd x;
     Eigen::VectorXd v;
@@ -53,7 +54,7 @@ class Solver
         );
 
         // solve method
-        Results solve();
+        Result solve();
 
         // update methods
         void update_settings(const Settings& settings);

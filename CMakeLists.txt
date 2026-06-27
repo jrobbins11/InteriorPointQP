@@ -7,7 +7,11 @@ project(MehrotraQP
 )
 set(TARGET_VAR MehrotraQP)
 
+# testing
 include(CTest)
+
+# compile commands
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Eigen dependency
 include(FetchContent)
