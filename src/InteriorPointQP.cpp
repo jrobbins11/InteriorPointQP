@@ -115,7 +115,7 @@ Result Solver::solve()
     auto timer_init = std::chrono::high_resolution_clock::now();
 
     // running timer
-    double running_timer = 0.9; // init
+    double running_timer = 0.0; // init
 
     // initialize primal and dual vars
     const double zeta = std::sqrt(settings_.barrier_init);
@@ -273,12 +273,12 @@ void Solver::generate_system_matrix()
             if (i_s < s_.rows())
             {
                 it.valueRef() = s_(i_s);
-                i_s++;
+                ++i_s;
             }
             else if (i_u < u_.rows())
             {
                 it.valueRef() = u_(i_u);
-                i_u++;
+                ++i_u;
             }
         }
     }
@@ -288,7 +288,6 @@ void Solver::generate_system_matrix()
 
     // get status
     lu_status_ = lu_solver_.info();
-
 }
 
 // generate right hand side of linear system
@@ -313,11 +312,10 @@ std::pair<double, bool> Solver::line_search(const Eigen::Ref<const Eigen::Vector
     // init
     double h = 1;
     bool valid = false;
-    int cnt_max = settings_.line_search_max_iterations;
     int cnt = 0;
 
     // loop
-    while (!valid && (cnt < cnt_max) && (h > EPSILON))
+    while (!valid && (cnt <  settings_.line_search_max_iterations) && (h > EPSILON))
     {
         // updated s, u
         const Eigen::VectorXd s_ds = s_ + h*del_s;
@@ -334,7 +332,7 @@ std::pair<double, bool> Solver::line_search(const Eigen::Ref<const Eigen::Vector
     }
 
     // check for validity
-    const bool no_progress = ((cnt == cnt_max) || (h <= EPSILON));
+    const bool no_progress = (cnt ==  settings_.line_search_max_iterations) || (h <= EPSILON);
 
     // output
     return {h, no_progress};
