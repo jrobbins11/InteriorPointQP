@@ -167,7 +167,42 @@ TEST_F(RandomQP, InfeasibleProblem)
     Eigen::VectorXd b = 1.01 * bound * Eigen::VectorXd::Ones(n_eq);
 
     // solve QP, check infeasible
-    Solver solver(P, q);
+    Solver solver(P, q, G, w, A, b);
     const Result result = solver.solve();
-    ASSERT_FALSE(result.feasible);
+    EXPECT_FALSE(result.feasible);
+}
+
+// Feasible equality-constrained problem produces feasible solution
+TEST_F(RandomQP, FeasibleProblem)
+{
+    const double bound = 10.;
+
+    // Add box constraints
+    std::vector<Eigen::Triplet<double>> triplets;
+    triplets.clear();
+    for (int i=0; i<n; ++i)
+    {
+        triplets.emplace_back(i, i, 1.0);
+        triplets.emplace_back(i+n, i, -1.0);
+    }
+    Eigen::SparseMatrix<double> G (2*n, n);
+    G.setFromTriplets(triplets.begin(), triplets.end());
+    Eigen::VectorXd w = bound * Eigen::VectorXd::Ones(2*n);
+
+    // Add some incompatible equality constraints
+    const int n_eq = n/4;
+    triplets.clear();
+    for (int i=0; i<n_eq; ++i)
+    {
+        triplets.emplace_back(i, i, 1.0);
+    }
+    Eigen::SparseMatrix<double> A (n_eq, n);
+    A.setFromTriplets(triplets.begin(), triplets.end());
+    Eigen::VectorXd b = 0.99 * bound * Eigen::VectorXd::Ones(n_eq);
+
+    // solve QP, check infeasible
+    Solver solver(P, q, G, w, A, b);
+    const Result result = solver.solve();
+    EXPECT_TRUE(result.feasible);
+    EXPECT_TRUE(result.converged);
 }
