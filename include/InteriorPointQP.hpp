@@ -85,10 +85,7 @@ class Solver
         Eigen::VectorXd x_, v_, u_, s_;
 
         // problem dimensions
-        int n_, m_ineq_, m_eq_;
-
-        // flags
-        bool equality_constrained_, inequality_constrained_;        
+        int n_, m_ineq_, m_eq_;   
 
         // helper methods
         double objective(const Eigen::Ref<const Eigen::VectorXd> x);
@@ -98,7 +95,7 @@ class Solver
         std::pair<double, bool> line_search(const Eigen::Ref<const Eigen::VectorXd> del_s, const Eigen::Ref<const Eigen::VectorXd> del_u);
         void remove_linearly_dependent_equality_constraints();
         double compute_mu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u) const;
-        bool compute_problem_dimensions();
+        bool check_problem_dimensions();
         void initialize_working_matrices();
         bool is_feasible(const Eigen::Ref<const Eigen::VectorXd> x) const;
 };

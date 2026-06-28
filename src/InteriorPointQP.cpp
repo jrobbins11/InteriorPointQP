@@ -97,7 +97,7 @@ Solver::Solver(
     remove_linearly_dependent_equality_constraints();
 
     // compute problem dimensions
-    if (!compute_problem_dimensions())
+    if (!check_problem_dimensions())
     {
         throw std::invalid_argument("Inconsistent problem dimensions");
     }
@@ -233,27 +233,23 @@ void Solver::initialize_working_matrices()
     //      A, 0, 0, 0;
     //      G, 0, 0, I;
     //      0, 0, S, Z]
-    std::vector<Eigen::Triplet<double>> tripvec_M0;
-    tripvec_M0.reserve(P_.nonZeros() + 2*A_.nonZeros() + 2*G_.nonZeros() + m_ineq_);
+    std::vector<Eigen::Triplet<double>> triplets;
+    triplets.reserve(P_.nonZeros() + 2*A_.nonZeros() + 2*G_.nonZeros() + m_ineq_);
     M0_.resize(n_ + m_eq_ + 2*m_ineq_, n_ + m_eq_ + 2*m_ineq_);
 
-    get_triplets(P_, tripvec_M0, 0, 0);
-    if (equality_constrained_)
-        get_triplets(A_T_, tripvec_M0, 0, n_);
-    get_triplets(G_T_, tripvec_M0, 0, n_ + m_eq_);
+    get_triplets(P_, triplets, 0, 0);
+    get_triplets(A_T_, triplets, 0, n_);
+    get_triplets(G_T_, triplets, 0, n_ + m_eq_);
 
-    if (equality_constrained_)
-        get_triplets(A_, tripvec_M0, n_, 0);
+    get_triplets(A_, triplets, n_, 0);
 
-    get_triplets(G_, tripvec_M0, n_ + m_eq_, 0);
-    get_triplets_diagonal(Eigen::VectorXd::Ones(m_ineq_), tripvec_M0, n_ + m_eq_, n_ + m_eq_ + m_ineq_);
+    get_triplets(G_, triplets, n_ + m_eq_, 0);
+    get_triplets_diagonal(Eigen::VectorXd::Ones(m_ineq_), triplets, n_ + m_eq_, n_ + m_eq_ + m_ineq_);
 
-    M0_.setFromTriplets(tripvec_M0.begin(), tripvec_M0.end());
+    M0_.setFromTriplets(triplets.begin(), triplets.end());
 
-    // pre-allocate and initialize dM
-    std::vector<Eigen::Triplet<double>> triplets;
+    // initialize dM
     triplets.clear();
-    triplets.reserve(2*m_ineq_);
     dM_.resize(n_ + m_eq_ + 2*m_ineq_, n_ + m_eq_ + 2*m_ineq_);
     get_triplets_diagonal(s_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_);
     get_triplets_diagonal(u_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_ + m_ineq_);
@@ -298,15 +294,8 @@ void Solver::generate_system_matrix()
 // generate right hand side of linear system
 void Solver::generate_rhs()
 {
-    if (equality_constrained_)
-    {
-        bm_.segment(0, n_) = -(P_*x_ + q_ + A_T_*v_ + G_T_*u_);
-        bm_.segment(n_, m_eq_) = -(A_*x_ - b_);
-    }
-    else 
-    {
-        bm_.segment(0, n_) = -(P_*x_ + q_ + G_T_*u_);
-    }
+    bm_.segment(0, n_) = -(P_*x_ + q_ + A_T_*v_ + G_T_*u_);
+    bm_.segment(n_, m_eq_) = -(A_*x_ - b_);
     bm_.segment(n_+m_eq_, m_ineq_) = -((G_*x_ - w_) + s_);
     bm_.segment(n_+m_eq_+m_ineq_, m_ineq_) = -(s_.array() * u_.array()); // elementwise multiplication, no centering term
 }
@@ -357,14 +346,12 @@ double Solver::compute_mu(const Eigen::Ref<const Eigen::VectorXd> s_in, const Ei
     return (s_in.dot(u_in))/m_ineq_;
 }
 
-bool Solver::compute_problem_dimensions()
+bool Solver::check_problem_dimensions()
 {
     // get dimension variables
     n_ = P_.rows();
     m_eq_ = A_.rows();
     m_ineq_ = G_.rows();
-    equality_constrained_ = m_eq_ > 0;
-    inequality_constrained_ = m_ineq_ > 0;
 
     // check validity
     const bool dims_consistent = n_ == q_.size() && n_ == P_.cols() && n_ == A_.cols() && n_ == G_.cols() 
@@ -409,7 +396,7 @@ void Solver::remove_linearly_dependent_equality_constraints()
 
 bool Solver::is_feasible(const Eigen::Ref<const Eigen::VectorXd> x) const
 {
-    const bool equality_cons_feasible = equality_constrained_ ? (A_*x - b_).cwiseAbs().maxCoeff() < settings_.feasibility_tolerance : true;
-    const bool inequality_cons_feasible = inequality_constrained_ ? (G_*x - w_).maxCoeff() < settings_.feasibility_tolerance : true;
+    const bool equality_cons_feasible = m_eq_ > 0 ? (A_*x - b_).cwiseAbs().maxCoeff() < settings_.feasibility_tolerance : true;
+    const bool inequality_cons_feasible = m_ineq_ > 0 ? (G_*x - w_).maxCoeff() < settings_.feasibility_tolerance : true;
     return equality_cons_feasible && inequality_cons_feasible;
 }
