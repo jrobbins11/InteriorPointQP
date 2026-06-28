@@ -9,23 +9,31 @@ using namespace InteriorPointQP;
 namespace 
 {
     // utilities
-    void getTripletsForMatrix(const Eigen::SparseMatrix<double> * mat_ptr, std::vector<Eigen::Triplet<double>> &tripvec,
-        int rowOffset, int colOffset)
-    {       
-        for (int i=0; i<mat_ptr->outerSize(); i++)
+    void get_triplets(const Eigen::SparseMatrix<double>& mat, std::vector<Eigen::Triplet<double>> &triplets,
+        int row_offset, int col_offset)
+    {
+        if (row_offset < 0 || col_offset < 0)
         {
-            for (typename Eigen::SparseMatrix<double>::InnerIterator it(*mat_ptr,i); it; ++it)
-                tripvec.emplace_back(it.row()+rowOffset, it.col()+colOffset, it.value());
+            throw std::invalid_argument("get_triplets: offsets out of range");
+        }       
+        for (int i=0; i<mat.outerSize(); i++)
+        {
+            for (typename Eigen::SparseMatrix<double>::InnerIterator it(mat,i); it; ++it)
+                triplets.emplace_back(it.row()+row_offset, it.col()+col_offset, it.value());
         }
     }
 
-    void getTripletsForMatrixDiagonal(const Eigen::Ref<const Eigen::VectorXd> d, std::vector<Eigen::Triplet<double>> &tripvec,
-                int rowOffset, int colOffset)
+    void get_triplets_diagonal(const Eigen::Ref<const Eigen::VectorXd> d, std::vector<Eigen::Triplet<double>> &triplets,
+                int row_offset, int col_offset)
     {
+        if (row_offset < 0 || col_offset < 0)
+        {
+            throw std::invalid_argument("get_triplets: offsets out of range");
+        }     
         int m = d.rows();
         for (int i=0; i<m; i++)
         {
-            tripvec.emplace_back(i+rowOffset, i+colOffset, d(i));
+            triplets.emplace_back(i+row_offset, i+col_offset, d(i));
         }
     }
 
@@ -233,16 +241,16 @@ void Solver::initialize_working_matrices()
     tripvec_M0.reserve(P_.nonZeros() + 2*A_.nonZeros() + 2*G_.nonZeros() + m_ineq_);
     M0_.resize(n_ + m_eq_ + 2*m_ineq_, n_ + m_eq_ + 2*m_ineq_);
 
-    getTripletsForMatrix(&P_, tripvec_M0, 0, 0);
+    get_triplets(P_, tripvec_M0, 0, 0);
     if (equality_constrained_)
-        getTripletsForMatrix(&A_T_, tripvec_M0, 0, n_);
-    getTripletsForMatrix(&G_T_, tripvec_M0, 0, n_ + m_eq_);
+        get_triplets(A_T_, tripvec_M0, 0, n_);
+    get_triplets(G_T_, tripvec_M0, 0, n_ + m_eq_);
 
     if (equality_constrained_)
-        getTripletsForMatrix(&A_, tripvec_M0, n_, 0);
+        get_triplets(A_, tripvec_M0, n_, 0);
 
-    getTripletsForMatrix(&G_, tripvec_M0, n_ + m_eq_, 0);
-    getTripletsForMatrixDiagonal(Eigen::VectorXd::Ones(m_ineq_), tripvec_M0, n_ + m_eq_, n_ + m_eq_ + m_ineq_);
+    get_triplets(G_, tripvec_M0, n_ + m_eq_, 0);
+    get_triplets_diagonal(Eigen::VectorXd::Ones(m_ineq_), tripvec_M0, n_ + m_eq_, n_ + m_eq_ + m_ineq_);
 
     M0_.setFromTriplets(tripvec_M0.begin(), tripvec_M0.end());
 
@@ -251,8 +259,8 @@ void Solver::initialize_working_matrices()
     triplets.clear();
     triplets.reserve(2*m_ineq_);
     dM_.resize(n_ + m_eq_ + 2*m_ineq_, n_ + m_eq_ + 2*m_ineq_);
-    getTripletsForMatrixDiagonal(s_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_);
-    getTripletsForMatrixDiagonal(u_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_ + m_ineq_);
+    get_triplets_diagonal(s_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_);
+    get_triplets_diagonal(u_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_ + m_ineq_);
     dM_.setFromTriplets(triplets.begin(), triplets.end());
 
     // analyze pattern
