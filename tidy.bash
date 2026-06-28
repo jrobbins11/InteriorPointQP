@@ -1,1 +1,1 @@
-run-clang-tidy -p build
+run-clang-tidy -p build -fix

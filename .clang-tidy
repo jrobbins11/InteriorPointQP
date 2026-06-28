@@ -1,5 +1,5 @@
 Checks: >
-  modernize-*,
+  "modernize-*,-modernize-use-trailing-return-type"
   readability-*,
   -readability-magic-numbers
 
