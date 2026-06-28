@@ -1,0 +1,8 @@
+Checks: >
+  modernize-*,
+  readability-*,
+  -readability-magic-numbers
+
+WarningsAsErrors: ""
+HeaderFilterRegex: ".*"
+FormatStyle: file
