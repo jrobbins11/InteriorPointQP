@@ -71,7 +71,7 @@ TEST_F(RandomQP, NearlyUnconstrainedOptimal)
     triplets.clear();
     for (int i=0; i<n; ++i)
     {
-        triplets.emplace_back(1, 1, 1.0);
+        triplets.emplace_back(i, i, 1.0);
     }
     Eigen::SparseMatrix<double> G (n, n);
     G.setFromTriplets(triplets.begin(), triplets.end());
@@ -141,5 +141,33 @@ TEST(MehrotraQP, UnconstrainedOptimal)
 // Infeasible problem produces infeasible solution
 TEST_F(RandomQP, InfeasibleProblem)
 {
-    // TODO
+    const double bound = 10.;
+
+    // Add box constraints
+    std::vector<Eigen::Triplet<double>> triplets;
+    triplets.clear();
+    for (int i=0; i<n; ++i)
+    {
+        triplets.emplace_back(i, i, 1.0);
+        triplets.emplace_back(i+n, i, -1.0);
+    }
+    Eigen::SparseMatrix<double> G (2*n, n);
+    G.setFromTriplets(triplets.begin(), triplets.end());
+    Eigen::VectorXd w = bound * Eigen::VectorXd::Ones(2*n);
+
+    // Add some incompatible equality constraints
+    const int n_eq = n/4;
+    triplets.clear();
+    for (int i=0; i<n_eq; ++i)
+    {
+        triplets.emplace_back(i, i, 1.0);
+    }
+    Eigen::SparseMatrix<double> A (n_eq, n);
+    A.setFromTriplets(triplets.begin(), triplets.end());
+    Eigen::VectorXd b = 1.01 * bound * Eigen::VectorXd::Ones(n_eq);
+
+    // solve QP, check infeasible
+    Solver solver(P, q);
+    const Result result = solver.solve();
+    ASSERT_FALSE(result.feasible);
 }
