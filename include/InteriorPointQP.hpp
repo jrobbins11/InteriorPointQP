@@ -9,7 +9,7 @@
 #include <utility>
 #include <limits>
 
-namespace MehrotraQP
+namespace InteriorPointQP
 {
 
 struct Settings
@@ -40,7 +40,7 @@ struct Result
 
     friend std::ostream& operator<<(std::ostream& os, const Result& result)
     {
-        os << "MehrotraQP Result: " << std::endl;
+        os << "InteriorPointQP Result: " << std::endl;
         if (result.x.size() < 10)
         {
             os << " x: " << result.x;

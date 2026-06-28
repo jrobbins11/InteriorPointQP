@@ -1,4 +1,4 @@
-#include "MehrotraQP.hpp"
+#include "InteriorPointQP.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -9,7 +9,7 @@
 #include <random>
 #include <iostream>
 
-using namespace MehrotraQP;
+using namespace InteriorPointQP;
 
 // test fixture
 class RandomQP : public ::testing::Test
@@ -44,7 +44,7 @@ protected:
 };
 
 // Test that problem dimension checking works
-TEST(MehrotraQP, InvalidProblemDimensions)
+TEST(InteriorPointQP, InvalidProblemDimensions)
 {
     // constructor with empty P and q matrices should throw
     EXPECT_THROW(Solver(Eigen::SparseMatrix<double>{}, Eigen::VectorXd{}), std::invalid_argument);
@@ -106,7 +106,7 @@ TEST_F(RandomQP, NearlyUnconstrainedOptimal)
 }
 
 // Unconstrained produces optimal solution
-TEST(MehrotraQP, UnconstrainedOptimal)
+TEST(InteriorPointQP, UnconstrainedOptimal)
 {
     // Problem: min 0.5 * (x-xr)^T (x-xr) -> solution is xr
     // q = xr

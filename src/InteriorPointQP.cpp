@@ -1,10 +1,10 @@
-#include "MehrotraQP.hpp"
+#include "InteriorPointQP.hpp"
 
 #include <chrono>
 #include <stdexcept>
 #include <limits>
 
-using namespace MehrotraQP;
+using namespace InteriorPointQP;
 
 namespace 
 {

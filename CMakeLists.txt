@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.15...3.27)
 
 # project name
-project(MehrotraQP
+project(InteriorPointQP
         VERSION 0.0.0
         LANGUAGES CXX
 )
-set(TARGET_VAR MehrotraQP)
+set(TARGET_VAR InteriorPointQP)
 
 # testing
 include(CTest)
@@ -33,7 +33,7 @@ endif()
 
 # source files
 set(SOURCE_FILES
-    src/MehrotraQP.cpp
+    src/InteriorPointQP.cpp
 )
 
 # build
