@@ -111,9 +111,6 @@ void Solver::update_settings(const Settings& settings)
 // solve
 Result Solver::solve()
 {
-    // declare
-    double mu, mu_pred, sigma;
-
     // start timer
     auto timer_init = std::chrono::high_resolution_clock::now();
 
@@ -135,7 +132,7 @@ Result Solver::solve()
     bool numerical_issue = false;
 
     // compute duality measure
-    mu = compute_mu(s_, u_);
+    double mu = compute_mu(s_, u_);
 
     // loop
     while ((mu > settings_.barrier_terminal) && (k < settings_.max_iterations) && 
@@ -158,14 +155,13 @@ Result Solver::solve()
         numerical_issue |= no_progress_pred;
 
         // predicted duality measure
-        mu_pred = compute_mu(s_ + h_pred*del_s_pred, u_ + h_pred*del_u_pred);
+        const double mu_pred = compute_mu(s_ + h_pred*del_s_pred, u_ + h_pred*del_u_pred);
 
         // centering parameter
-        sigma = pow(mu_pred/mu, 3);
+        const double sigma = std::pow(mu_pred/mu, 3);
 
         // calculate corrected nu and recompute search direction
-        Del_S_.diagonal() = del_s_pred;
-        update_rhs((sigma*mu)*Eigen::VectorXd::Ones(m_ineq_) - Del_S_*del_u_pred);
+        update_rhs((sigma*mu)*Eigen::ArrayXd::Ones(m_ineq_) - del_s_pred.array() * del_u_pred.array());
 
         const Eigen::VectorXd del_corr = lu_solver_.solve(bm_);
         const auto& del_x_corr = del_corr.segment(0, n_);
@@ -302,44 +298,24 @@ void Solver::generate_system_matrix()
 // generate right hand side of linear system
 void Solver::generate_rhs()
 {
-    // compute r_E term
-    Eigen::VectorXd r_C, r_E;
     if (equality_constrained_)
     {
-        // compute r_C term
-        r_C = P_*x_ + q_ + A_T_*v_ + G_T_*u_;
-
-        // compute r_E term
-        r_E = A_*x_ - b_;
+        bm_.segment(0, n_) = -(P_*x_ + q_ + A_T_*v_ + G_T_*u_);
+        bm_.segment(n_, m_eq_) = -(A_*x_ - b_);
     }
-    else
+    else 
     {
-        r_C = P_*x_ + q_ + G_T_*u_;
+        bm_.segment(0, n_) = -(P_*x_ + q_ + G_T_*u_);
     }
-
-    // compute r_I term
-    const Eigen::VectorXd r_I = (G_*x_ - w_) + s_;
-
-    // compute r_S term
-    S_.diagonal() = s_;
-    r_S_ = S_*u_; // no centering term
-
-    // RHS
-    bm_.segment(0, n_) = -r_C;
-    if (equality_constrained_)
-        bm_.segment(n_, m_eq_) = -r_E;
-    bm_.segment(n_+m_eq_, m_ineq_) = -r_I;
-    bm_.segment(n_+m_eq_+m_ineq_, m_ineq_) = -r_S_;
+    bm_.segment(n_+m_eq_, m_ineq_) = -((G_*x_ - w_) + s_);
+    bm_.segment(n_+m_eq_+m_ineq_, m_ineq_) = -(s_.array() * u_.array()); // elementwise multiplication, no centering term
 }
 
 // update RHS
-void Solver::update_rhs(const Eigen::Ref<const Eigen::VectorXd> nu)
-{
-    // update r_S term
-    r_S_ -= nu;
-    
+void Solver::update_rhs(const Eigen::Ref<const Eigen::ArrayXd> nu)
+{   
     // update RHS
-    bm_.segment(n_+m_eq_+m_ineq_, m_ineq_) = -r_S_;
+    bm_.segment(n_+m_eq_+m_ineq_, m_ineq_) = -(s_.array() * u_.array() - nu);
 }
 
 // line search

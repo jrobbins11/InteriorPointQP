@@ -77,14 +77,12 @@ class Solver
 
         // linear system
         Eigen::SparseMatrix<double> M0_, dM_;
-        Eigen::VectorXd bm_, r_S_;
+        Eigen::VectorXd bm_;
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> lu_solver_;
         Eigen::ComputationInfo lu_status_ = Eigen::ComputationInfo::Success;
 
         // working vars
         Eigen::VectorXd x_, v_, u_, s_;
-        Eigen::VectorXd nu_;
-        Eigen::DiagonalMatrix<double, -1> S_, Del_S_;
 
         // problem dimensions
         int n_, m_ineq_, m_eq_;
@@ -96,7 +94,7 @@ class Solver
         double objective(const Eigen::Ref<const Eigen::VectorXd> x);
         void generate_system_matrix();
         void generate_rhs();
-        void update_rhs(const Eigen::Ref<const Eigen::VectorXd> nu);
+        void update_rhs(const Eigen::Ref<const Eigen::ArrayXd> nu);
         std::pair<double, bool> line_search(const Eigen::Ref<const Eigen::VectorXd> del_s, const Eigen::Ref<const Eigen::VectorXd> del_u);
         void remove_linearly_dependent_equality_constraints();
         double compute_mu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u) const;
