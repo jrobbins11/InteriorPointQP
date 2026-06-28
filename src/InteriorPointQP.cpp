@@ -2,7 +2,7 @@
 
 #include <chrono>
 #include <stdexcept>
-#include <limits>
+#include <cmath>
 
 using namespace InteriorPointQP;
 
@@ -33,6 +33,38 @@ namespace
     constexpr double EPSILON = Eigen::NumTraits<double>::dummy_precision();
 }
 
+std::ostream& operator<<(std::ostream& os, const Settings& settings)
+{
+    os << "InteriorPointQP Settings: " << std::endl;
+    os << " max_time_sec: " << settings.max_time_sec << std::endl;
+    os << " barrier_init: " << settings.barrier_init << std::endl;
+    os << " barrier_max: " << settings.barrier_max << std::endl;
+    os << " barrier_terminal: " << settings.barrier_terminal << std::endl;
+    os << " feasibility_tolerance: " << settings.feasibility_tolerance << std::endl;
+    os << " max_iterations: " << settings.max_iterations << std::endl;
+    os << " line_search_gamma: " << settings.line_search_gamma << std::endl;
+    os << " line_search_t: " << settings.line_search_t << std::endl;
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const Result& result)
+{
+    os << "InteriorPointQP Result: " << std::endl;
+    if (result.solution.size() < 10)
+    {
+        os << " solution: " << result.solution;
+        os << " dual_solution_v: " << result.dual_solution_v;
+        os << " dual_solution_u: " << result.dual_solution_u;
+        os << " slack_solution_s: " << result.slack_solution_s;
+    }
+    os << " objective: " << result.objective << std::endl;
+    os << " converged: " << result.converged << std::endl;
+    os << " feasible: " << result.feasible << std::endl;
+    os << " num_iteratins: " << result.num_iterations << std::endl;
+    os << " solution_time_sec: " << result.solution_time_sec << " s" << std::endl;
+    return os;
+}
+
 // constructor
 Solver::Solver(
     const Eigen::SparseMatrix<double>& P,
@@ -54,12 +86,7 @@ Solver::Solver(
     settings_ = settings;    
 
     // preprocessing (make sure A is full rank)
-    if (settings_.preprocessing_enable)
-    {
-        make_valid_equality_constraints();
-        make_valid_A();
-        make_valid_b();
-    }
+    remove_linearly_dependent_equality_constraints();
 
     // compute problem dimensions
     if (!compute_problem_dimensions())
@@ -77,103 +104,76 @@ void Solver::update_settings(const Settings& settings)
 Result Solver::solve()
 {
     // declare
-    double mu, h, mu_pred, sigma;
-    Eigen::VectorXd del, del_x, del_v, del_u, del_s;
-    Eigen::VectorXd s_pred, u_pred;
-    bool numerical_issue;
-    std::pair<double, bool> line_search_out;
+    double mu, mu_pred, sigma;
 
     // start timer
     auto timer_init = std::chrono::high_resolution_clock::now();
 
     // running timer
-    double running_timer = 0; // init
-
-    // initialize start vars
-    x0_ = Eigen::VectorXd::Zero(n_);
-    double zeta = sqrt(settings_.mu_init);
-    v0_ = Eigen::VectorXd::Zero(m_eq_);
-    u0_ = zeta*Eigen::VectorXd::Ones(m_ineq_);
-    s0_ = zeta*Eigen::VectorXd::Ones(m_ineq_);
+    double running_timer = 0.9; // init
 
     // initialize primal and dual vars
-    x_ = x0_;
-    v_ = v0_;
-    u_ = u0_;
-    s_ = s0_;
+    const double zeta = std::sqrt(settings_.barrier_init);
+    x_ = Eigen::VectorXd::Zero(n_);
+    v_ = Eigen::VectorXd::Zero(m_eq_);
+    u_ = zeta*Eigen::VectorXd::Ones(m_ineq_);
+    s_ = zeta*Eigen::VectorXd::Ones(m_ineq_);
 
     // initialize working matrices
     initialize_working_matrices();
 
     // outer loop init
     int k = 0;
-    numerical_issue = false;
+    bool numerical_issue = false;
 
     // compute duality measure
     mu = compute_mu(s_, u_);
 
     // loop
-    while ((mu > settings_.mu_term) && (k < settings_.iter_max) && 
-        !numerical_issue && (running_timer < settings_.T_max) && (mu <= settings_.mu_max))
+    while ((mu > settings_.barrier_terminal) && (k < settings_.max_iterations) && 
+        !numerical_issue && (running_timer < settings_.max_time_sec) && (mu <= settings_.barrier_max))
     {
         // generate system matrix and decompose
         generate_system_matrix();
 
         // check for numerical issues and terminate if necessary
-        if (lu_status_ != Eigen::ComputationInfo::Success)
-        {
-            numerical_issue = true;
-            break;
-        } 
+        numerical_issue |= (lu_status_ != Eigen::ComputationInfo::Success);
 
         // predictor step
         generate_rhs();
-        del = lu_solver_.solve(bm_);
-        del_u = del.segment(n_+m_eq_, m_ineq_);
-        del_s = del.segment(n_+m_eq_+m_ineq_, m_ineq_);
+        const Eigen::VectorXd del_pred = lu_solver_.solve(bm_);
+        const auto& del_u_pred = del_pred.segment(n_+m_eq_, m_ineq_);
+        const auto& del_s_pred = del_pred.segment(n_+m_eq_+m_ineq_, m_ineq_);
 
         // line search for step size
-        line_search_out = line_search(del_s, del_u);
-        h = line_search_out.first;
-        if (line_search_out.second)
-        {
-            numerical_issue = true;
-            break;
-        }
+        const auto [h_pred, no_progress_pred] = line_search(del_s_pred, del_u_pred);
+        numerical_issue |= no_progress_pred;
 
         // predicted duality measure
-        s_pred = s_ + h*del_s;
-        u_pred = u_ + h*del_u;
-        mu_pred = compute_mu(s_pred, u_pred);
+        mu_pred = compute_mu(s_ + h_pred*del_s_pred, u_ + h_pred*del_u_pred);
 
         // centering parameter
         sigma = pow(mu_pred/mu, 3);
 
         // calculate corrected nu and recompute search direction
-        Del_S_.diagonal() = del_s;
-        nu_ = (sigma*mu)*Eigen::VectorXd::Ones(m_ineq_) - Del_S_*del_u;
-        update_rhs();
+        Del_S_.diagonal() = del_s_pred;
+        update_rhs((sigma*mu)*Eigen::VectorXd::Ones(m_ineq_) - Del_S_*del_u_pred);
 
-        del = lu_solver_.solve(bm_);
-        del_x = del.segment(0, n_);
-        del_v = del.segment(n_, m_eq_);
-        del_u = del.segment(n_+m_eq_, m_ineq_);
-        del_s = del.segment(n_+m_eq_+m_ineq_, m_ineq_);
+        const Eigen::VectorXd del_corr = lu_solver_.solve(bm_);
+        const auto& del_x_corr = del_corr.segment(0, n_);
+        const auto& del_v_corr = del_corr.segment(n_, m_eq_);
+        const auto& del_u_corr = del_corr.segment(n_+m_eq_, m_ineq_);
+        const auto& del_s_corr = del_corr.segment(n_+m_eq_+m_ineq_, m_ineq_);
 
         // line search for step size
-        line_search_out = line_search(del_s, del_u);
-        h = line_search_out.first;
-        if (line_search_out.second)
-        {
-            numerical_issue = true;
-            break;
-        }
+        const auto [h_corr, no_progress_corr] = line_search(del_s_corr, del_u_corr);
+        numerical_issue |= no_progress_corr;
 
         // update
-        x_ = x_ + settings_.gamma*h*del_x;
-        v_ = v_ + settings_.gamma*h*del_v;
-        u_ = u_ + settings_.gamma*h*del_u;
-        s_ = s_ + settings_.gamma*h*del_s;
+        x_ += settings_.line_search_gamma*h_corr*del_x_corr;
+        v_ += settings_.line_search_gamma*h_corr*del_v_corr;
+        u_ += settings_.line_search_gamma*h_corr*del_u_corr;
+        s_ += settings_.line_search_gamma*h_corr*del_s_corr;
 
         // update running timer
         auto timer_running = std::chrono::high_resolution_clock::now();
@@ -184,7 +184,7 @@ Result Solver::solve()
         mu = compute_mu(s_, u_);
 
         // iterate 
-        k++;
+        ++k;
     }
 
     // timing
@@ -194,21 +194,19 @@ Result Solver::solve()
 
     // assemble results
     Result results;
-    results.x = x_;
-    results.v = v_;
-    results.u = u_;
-    results.s = s_;
+    results.solution = x_;
+    results.dual_solution_v = v_;
+    results.dual_solution_u = u_;
+    results.slack_solution_s = s_;
     results.objective = objective(x_);
-    results.feasible = mu <= settings_.mu_feas; // divergence check
-    results.converged = !numerical_issue && (k < settings_.iter_max) && results.feasible;
-    results.num_iter = k;
-    results.sol_time = time;
+    results.feasible = is_feasible(x_);
+    results.converged = !numerical_issue && (k < settings_.max_iterations);
+    results.num_iterations = k;
+    results.solution_time_sec = time;
 
     // return
     return results;
 }
-
-/* helper methods */
 
 // objective function
 double Solver::objective(const Eigen::Ref<const Eigen::VectorXd> x_in)
@@ -236,11 +234,11 @@ void Solver::initialize_working_matrices()
     M0_.resize(n_ + m_eq_ + 2*m_ineq_, n_ + m_eq_ + 2*m_ineq_);
 
     getTripletsForMatrix(&P_, tripvec_M0, 0, 0);
-    if (equalityConstrained_)
+    if (equality_constrained_)
         getTripletsForMatrix(&A_T_, tripvec_M0, 0, n_);
     getTripletsForMatrix(&G_T_, tripvec_M0, 0, n_ + m_eq_);
 
-    if (equalityConstrained_)
+    if (equality_constrained_)
         getTripletsForMatrix(&A_, tripvec_M0, n_, 0);
 
     getTripletsForMatrix(&G_, tripvec_M0, n_ + m_eq_, 0);
@@ -249,16 +247,16 @@ void Solver::initialize_working_matrices()
     M0_.setFromTriplets(tripvec_M0.begin(), tripvec_M0.end());
 
     // pre-allocate and initialize dM
-    triplets_.clear();
-    triplets_.reserve(2*m_ineq_);
+    std::vector<Eigen::Triplet<double>> triplets;
+    triplets.clear();
+    triplets.reserve(2*m_ineq_);
     dM_.resize(n_ + m_eq_ + 2*m_ineq_, n_ + m_eq_ + 2*m_ineq_);
-    getTripletsForMatrixDiagonal(s_, triplets_, n_ + m_eq_ + m_ineq_, n_ + m_eq_);
-    getTripletsForMatrixDiagonal(u_, triplets_, n_ + m_eq_ + m_ineq_, n_ + m_eq_ + m_ineq_);
-    dM_.setFromTriplets(triplets_.begin(), triplets_.end());
+    getTripletsForMatrixDiagonal(s_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_);
+    getTripletsForMatrixDiagonal(u_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_ + m_ineq_);
+    dM_.setFromTriplets(triplets.begin(), triplets.end());
 
     // analyze pattern
-    M_ = M0_ + dM_;
-    lu_solver_.analyzePattern(M_);
+    lu_solver_.analyzePattern(M0_ + dM_);
 }
 
 // generate system matrix
@@ -284,12 +282,9 @@ void Solver::generate_system_matrix()
             }
         }
     }
-    
-    // update M
-    M_ = M0_ + dM_;
 
     // LU decomposition
-    lu_solver_.factorize(M_);
+    lu_solver_.factorize(M0_ + dM_);
 
     // get status
     lu_status_ = lu_solver_.info();
@@ -300,37 +295,40 @@ void Solver::generate_system_matrix()
 void Solver::generate_rhs()
 {
     // compute r_E term
-    if (equalityConstrained_)
+    Eigen::VectorXd r_C, r_E;
+    if (equality_constrained_)
     {
         // compute r_C term
-        r_C_ = P_*x_ + q_ + A_T_*v_ + G_T_*u_;
+        r_C = P_*x_ + q_ + A_T_*v_ + G_T_*u_;
 
         // compute r_E term
-        r_E_ = A_*x_ - b_;
+        r_E = A_*x_ - b_;
     }
     else
-        r_C_ = P_*x_ + q_ + G_T_*u_;
+    {
+        r_C = P_*x_ + q_ + G_T_*u_;
+    }
 
     // compute r_I term
-    r_I_ = (G_*x_ - w_) + s_;
+    const Eigen::VectorXd r_I = (G_*x_ - w_) + s_;
 
     // compute r_S term
     S_.diagonal() = s_;
     r_S_ = S_*u_; // no centering term
 
     // RHS
-    bm_.segment(0, n_) = -r_C_;
-    if (equalityConstrained_)
-        bm_.segment(n_, m_eq_) = -r_E_;
-    bm_.segment(n_+m_eq_, m_ineq_) = -r_I_;
+    bm_.segment(0, n_) = -r_C;
+    if (equality_constrained_)
+        bm_.segment(n_, m_eq_) = -r_E;
+    bm_.segment(n_+m_eq_, m_ineq_) = -r_I;
     bm_.segment(n_+m_eq_+m_ineq_, m_ineq_) = -r_S_;
 }
 
 // update RHS
-void Solver::update_rhs()
+void Solver::update_rhs(const Eigen::Ref<const Eigen::VectorXd> nu)
 {
     // update r_S term
-    r_S_ = r_S_ - nu_;
+    r_S_ -= nu;
     
     // update RHS
     bm_.segment(n_+m_eq_+m_ineq_, m_ineq_) = -r_S_;
@@ -339,74 +337,40 @@ void Solver::update_rhs()
 // line search
 std::pair<double, bool> Solver::line_search(const Eigen::Ref<const Eigen::VectorXd> del_s, const Eigen::Ref<const Eigen::VectorXd> del_u)
 {
-    // declare
-    Eigen::VectorXd s_ds, u_du;
-
     // init
     double h = 1;
     bool valid = false;
-    int cnt_max = 10000;
+    int cnt_max = settings_.line_search_max_iterations;
     int cnt = 0;
 
     // loop
     while (!valid && (cnt < cnt_max) && (h > EPSILON))
     {
         // updated s, u
-        s_ds = s_ + h*del_s;
-        u_du = u_ + h*del_u;
+        const Eigen::VectorXd s_ds = s_ + h*del_s;
+        const Eigen::VectorXd u_du = u_ + h*del_u;
 
         // check for validity of step
         if ((s_ds.minCoeff() > 0) && (u_du.minCoeff() > 0))
             valid = true;
         else
-            h = settings_.t_ls*h;
+            h = settings_.line_search_t*h;
 
         // increment
-        cnt++;
+        ++cnt;
     }
 
     // check for validity
-    bool numerical_issue = ((cnt == cnt_max) || (h <= EPSILON));
+    const bool no_progress = ((cnt == cnt_max) || (h <= EPSILON));
 
     // output
-    return std::pair<double, bool> {h, numerical_issue};
+    return {h, no_progress};
 }
 
 // duality measure 
-double Solver::compute_mu(const Eigen::Ref<const Eigen::VectorXd> s_in, const Eigen::Ref<const Eigen::VectorXd> u_in)
+double Solver::compute_mu(const Eigen::Ref<const Eigen::VectorXd> s_in, const Eigen::Ref<const Eigen::VectorXd> u_in) const
 {
     return (s_in.dot(u_in))/m_ineq_;
-}
-
-// pre-processing
-void Solver::get_permute_matrix(const Eigen::SparseMatrix<double> * mat_in, Eigen::SparseMatrix<double> * mat_out)
-{
-    // check for empty input matrix
-    if (mat_in->rows() == 0 || mat_in->cols() == 0)
-    {
-        mat_out->resize(0, 0);
-        return;
-    }
-
-    // matrix transpose
-    Eigen::SparseMatrix<double> mat_T = mat_in->transpose();
-
-    // compute QR decomposition
-    qr_solver_.analyzePattern(mat_T);
-    qr_solver_.factorize(mat_T);
-
-    // get permutation matrix and its indices
-    Eigen::PermutationMatrix<-1, -1> P_full = qr_solver_.colsPermutation();
-    Eigen::VectorXi ind_full = P_full.indices();
-
-    // construct permute and chop matrix directly
-    std::vector<Eigen::Triplet<double>> tripvec;
-    tripvec.reserve(ind_full.size());
-    for (int i=0; i<qr_solver_.rank(); i++) // QR solver automatically puts linearly dependent rows at end
-        tripvec.push_back(Eigen::Triplet<double>(ind_full[i], i, 1));
-
-    mat_out->resize(mat_T.cols(), qr_solver_.rank());
-    mat_out->setFromTriplets(tripvec.begin(), tripvec.end());
 }
 
 bool Solver::compute_problem_dimensions()
@@ -415,7 +379,8 @@ bool Solver::compute_problem_dimensions()
     n_ = P_.rows();
     m_eq_ = A_.rows();
     m_ineq_ = G_.rows();
-    equalityConstrained_ = (m_eq_ == 0) ? false : true;
+    equality_constrained_ = m_eq_ > 0;
+    inequality_constrained_ = m_ineq_ > 0;
 
     // check validity
     const bool dims_consistent = n_ == q_.size() && n_ == P_.cols() && n_ == A_.cols() && n_ == G_.cols() 
@@ -424,19 +389,43 @@ bool Solver::compute_problem_dimensions()
     return dims_consistent && dims_valid;
 }
 
-void Solver::make_valid_equality_constraints()
+void Solver::remove_linearly_dependent_equality_constraints()
 {
-    // remove any invalid constraints (linearly dependent)
-    get_permute_matrix(&A_, &P_eq_);
+    // check for empty input matrix
+    if (A_.rows() == 0 || A_.cols() == 0)
+    {
+        return;
+    }
+
+    // matrix transpose
+    Eigen::SparseMatrix<double> mat_T = A_.transpose();
+
+    // compute QR decomposition
+    Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> qr_solver;
+    qr_solver.analyzePattern(mat_T);
+    qr_solver.factorize(mat_T);
+
+    // get permutation matrix and its indices
+    Eigen::PermutationMatrix<-1, -1> P_full = qr_solver.colsPermutation();
+    Eigen::VectorXi ind_full = P_full.indices();
+
+    // construct permutation matrix
+    std::vector<Eigen::Triplet<double>> triplets;
+    triplets.reserve(ind_full.size());
+    for (int i=0; i<qr_solver.rank(); i++) // QR solver automatically puts linearly dependent rows at end
+        triplets.emplace_back(ind_full[i], i, 1);
+
+    Eigen::SparseMatrix<double> P_eq (mat_T.cols(), qr_solver.rank());
+    P_eq.setFromTriplets(triplets.begin(), triplets.end());
+
+    // update equality constraints
+    A_ = (A_.transpose()*P_eq).transpose();
+    b_ = (b_.transpose()*P_eq).transpose();
 }
 
-void Solver::make_valid_A()
+bool Solver::is_feasible(const Eigen::Ref<const Eigen::VectorXd> x) const
 {
-    A_ = (A_.transpose()*P_eq_).transpose();
+    const bool equality_cons_feasible = equality_constrained_ ? (A_*x - b_).cwiseAbs().maxCoeff() < settings_.feasibility_tolerance : true;
+    const bool inequality_cons_feasible = inequality_constrained_ ? (G_*x - w_).maxCoeff() < settings_.feasibility_tolerance : true;
+    return equality_cons_feasible && inequality_cons_feasible;
 }
-
-void Solver::make_valid_b()
-{
-    b_ = (b_.transpose()*P_eq_).transpose();
-}
-

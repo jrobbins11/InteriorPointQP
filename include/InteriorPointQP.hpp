@@ -14,47 +14,32 @@ namespace InteriorPointQP
 
 struct Settings
 {
-    double mu_term = 1e-3;
-    double mu_feas = 1e0;
-    double mu_max = 1e20; // TODO: robustify infeasibility detection
-    double mu_init = 1e6;
-    double eps_feas = 1e-6;
-    int iter_max = 100;
-    double gamma = 0.999;
-    double t_ls = 0.9;
-    bool preprocessing_enable = true;
-    double T_max = std::numeric_limits<double>::infinity();
+    double max_time_sec = std::numeric_limits<double>::infinity();
+    double barrier_init = 1e6;
+    double barrier_terminal = 1e-3;
+    double barrier_max = 1e20; // TODO: robustify infeasibility detection
+    double feasibility_tolerance = 1e-6;
+    int max_iterations = 100;
+    double line_search_gamma = 0.999;
+    double line_search_t = 0.9;
+    int line_search_max_iterations = 1000;
+
+    friend std::ostream& operator<<(std::ostream& os, const Settings& settings);
 };
 
 struct Result
 {
-    Eigen::VectorXd x;
-    Eigen::VectorXd v;
-    Eigen::VectorXd u;
-    Eigen::VectorXd s;
-    double objective;
-    bool converged;
-    int num_iter;
-    double sol_time;
-    bool feasible;
+    Eigen::VectorXd solution {};
+    Eigen::VectorXd dual_solution_v {};
+    Eigen::VectorXd dual_solution_u {};
+    Eigen::VectorXd slack_solution_s {};
+    double objective {};
+    bool converged {};
+    bool feasible {};
+    int num_iterations {};
+    double solution_time_sec {};
 
-    friend std::ostream& operator<<(std::ostream& os, const Result& result)
-    {
-        os << "InteriorPointQP Result: " << std::endl;
-        if (result.x.size() < 10)
-        {
-            os << " x: " << result.x;
-            os << " v: " << result.v;
-            os << " u: " << result.u;
-            os << " s: " << result.s;
-        }
-        os << " objective: " << result.objective << std::endl;
-        os << " converged: " << result.converged << std::endl;
-        os << " num_iter: " << result.num_iter << std::endl;
-        os << " sol_time: " << result.sol_time << " s" << std::endl;
-        os << " feasible: " << result.feasible << std::endl;
-        return os;
-    }
+    friend std::ostream& operator<<(std::ostream& os, const Result& result);
 };
 
 class Solver
@@ -91,19 +76,10 @@ class Solver
         Settings settings_;
 
         // linear system
-        Eigen::SparseMatrix<double> M_, M0_, dM_;
-        std::vector<Eigen::Triplet<double>> triplets_;
-        Eigen::VectorXd r_C_, r_E_, r_I_, r_S_;
-        Eigen::VectorXd bm_;
+        Eigen::SparseMatrix<double> M0_, dM_;
+        Eigen::VectorXd bm_, r_S_;
         Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> lu_solver_;
         Eigen::ComputationInfo lu_status_ = Eigen::ComputationInfo::Success;
-
-        // preprocessing
-        Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> qr_solver_;
-        Eigen::SparseMatrix<double> P_eq_;
-
-        // initial vars
-        Eigen::VectorXd x0_, v0_, u0_, s0_;
 
         // working vars
         Eigen::VectorXd x_, v_, u_, s_;
@@ -114,21 +90,19 @@ class Solver
         int n_, m_ineq_, m_eq_;
 
         // flags
-        bool equalityConstrained_;        
+        bool equality_constrained_, inequality_constrained_;        
 
         // helper methods
         double objective(const Eigen::Ref<const Eigen::VectorXd> x);
         void generate_system_matrix();
         void generate_rhs();
-        void update_rhs();
+        void update_rhs(const Eigen::Ref<const Eigen::VectorXd> nu);
         std::pair<double, bool> line_search(const Eigen::Ref<const Eigen::VectorXd> del_s, const Eigen::Ref<const Eigen::VectorXd> del_u);
-        void get_permute_matrix(const Eigen::SparseMatrix<double> * mat_in, Eigen::SparseMatrix<double> * mat_out);
-        void make_valid_equality_constraints();
-        void make_valid_A();
-        void make_valid_b();
-        double compute_mu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u);
+        void remove_linearly_dependent_equality_constraints();
+        double compute_mu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u) const;
         bool compute_problem_dimensions();
         void initialize_working_matrices();
+        bool is_feasible(const Eigen::Ref<const Eigen::VectorXd> x) const;
 };
 
 } // end namespace

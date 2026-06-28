@@ -100,8 +100,8 @@ TEST_F(RandomQP, NearlyUnconstrainedOptimal)
     // check that random perturbations have higher objective
     for (int i=0; i<100; ++i)
     {
-        const double result_norm = result.x.norm();
-        EXPECT_LT(result.objective, perturbed_objective(result.x, 0.01*result_norm));
+        const double result_norm = result.solution.norm();
+        EXPECT_LT(result.objective, perturbed_objective(result.solution, 0.01*result_norm));
     }
 }
 
@@ -134,7 +134,7 @@ TEST(InteriorPointQP, UnconstrainedOptimal)
     // check solution matches expectation
     for (int i=0; i<n; ++i)
     {
-        EXPECT_NEAR(result.x(i), q(i), 1e-6);
+        EXPECT_NEAR(result.solution(i), q(i), 1e-6);
     }
 }
 
@@ -212,3 +212,5 @@ TEST(InteriorPointQP, ResultCorrectness)
 {
     //TODO
 }
+
+// TODO: Equality constraints not linearly independent
