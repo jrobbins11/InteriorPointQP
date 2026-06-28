@@ -91,48 +91,44 @@ class Solver
         Settings settings_;
 
         // linear system
-        Eigen::SparseMatrix<double> M, M0, dM;
-        std::vector<Eigen::Triplet<double>> tripvec_dM;
-        Eigen::VectorXd r_C, r_E, r_I, r_S;
-        Eigen::VectorXd bm;
-        Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> LU_solver;
-        Eigen::ComputationInfo LU_status = Eigen::ComputationInfo::Success;
+        Eigen::SparseMatrix<double> M_, M0_, dM_;
+        std::vector<Eigen::Triplet<double>> triplets_;
+        Eigen::VectorXd r_C_, r_E_, r_I_, r_S_;
+        Eigen::VectorXd bm_;
+        Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> lu_solver_;
+        Eigen::ComputationInfo lu_status_ = Eigen::ComputationInfo::Success;
 
         // preprocessing
-        Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> QR_solver;
-        Eigen::SparseMatrix<double> P_eq;
+        Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> qr_solver_;
+        Eigen::SparseMatrix<double> P_eq_;
 
         // initial vars
-        Eigen::VectorXd x0, v0, u0, s0;
+        Eigen::VectorXd x0_, v0_, u0_, s0_;
 
         // working vars
-        Eigen::VectorXd x, v, u, s;
-        Eigen::VectorXd nu;
-        Eigen::DiagonalMatrix<double, -1> S, Del_S;
-
-        // duality measure
-        double mu;
+        Eigen::VectorXd x_, v_, u_, s_;
+        Eigen::VectorXd nu_;
+        Eigen::DiagonalMatrix<double, -1> S_, Del_S_;
 
         // problem dimensions
         int n_, m_ineq_, m_eq_;
 
         // flags
-        bool equalityConstrained_;
-        
+        bool equalityConstrained_;        
 
         // helper methods
         double objective(const Eigen::Ref<const Eigen::VectorXd> x);
-        void generateSystemMatrix();
-        void generateRHS();
-        void updateRHS();
-        std::pair<double, bool> lineSearch(const Eigen::Ref<const Eigen::VectorXd> del_s, const Eigen::Ref<const Eigen::VectorXd> del_u);
-        void getLinDepPermuteAndChopMatrix(const Eigen::SparseMatrix<double> * mat_in, Eigen::SparseMatrix<double> * mat_out);
-        void getValidEqualityConstraints();
-        void makeValid_A();
-        void makeValid_b();
-        double computeMu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u);
-        bool computeProblemDimensions();
-        void initializeWorkingMatrices();
+        void generate_system_matrix();
+        void generate_rhs();
+        void update_rhs();
+        std::pair<double, bool> line_search(const Eigen::Ref<const Eigen::VectorXd> del_s, const Eigen::Ref<const Eigen::VectorXd> del_u);
+        void get_permute_matrix(const Eigen::SparseMatrix<double> * mat_in, Eigen::SparseMatrix<double> * mat_out);
+        void make_valid_equality_constraints();
+        void make_valid_A();
+        void make_valid_b();
+        double compute_mu(const Eigen::Ref<const Eigen::VectorXd> s, const Eigen::Ref<const Eigen::VectorXd> u);
+        bool compute_problem_dimensions();
+        void initialize_working_matrices();
 };
 
 } // end namespace

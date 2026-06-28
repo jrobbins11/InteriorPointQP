@@ -206,3 +206,9 @@ TEST_F(RandomQP, FeasibleProblem)
     EXPECT_TRUE(result.feasible);
     EXPECT_TRUE(result.converged);
 }
+
+// Known QP solution
+TEST(InteriorPointQP, ResultCorrectness)
+{
+    //TODO
+}
