@@ -33,7 +33,7 @@ endif()
 
 # source files
 set(SOURCE_FILES
-    src/InteriorPointQP.cpp
+    InteriorPointQP.cpp
 )
 
 # build
@@ -45,7 +45,7 @@ target_link_libraries(${TARGET_VAR} PUBLIC Eigen3::Eigen)
 # include directories
 target_include_directories(${TARGET_VAR} PUBLIC
         $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 
 # C++ standard
