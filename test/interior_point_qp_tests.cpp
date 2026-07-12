@@ -378,3 +378,5 @@ TEST(InteriorPointQP, ResultCorrectnessHS76)
     // check objective against known value
     EXPECT_NEAR(result.objective, -4.681818181, 1e-2);
 }
+
+//TODO: check that this solves LPs

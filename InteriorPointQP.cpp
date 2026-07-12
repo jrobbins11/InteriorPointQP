@@ -41,38 +41,6 @@ namespace
     constexpr double EPSILON = Eigen::NumTraits<double>::dummy_precision();
 }
 
-std::ostream& operator<<(std::ostream& os, const Settings& settings)
-{
-    os << "InteriorPointQP Settings: " << std::endl;
-    os << " max_time_sec: " << settings.max_time_sec << std::endl;
-    os << " barrier_init: " << settings.barrier_init << std::endl;
-    os << " barrier_max: " << settings.barrier_max << std::endl;
-    os << " barrier_terminal: " << settings.barrier_converged << std::endl;
-    os << " feasibility_tolerance: " << settings.feasibility_tolerance << std::endl;
-    os << " max_iterations: " << settings.max_iterations << std::endl;
-    os << " line_search_gamma: " << settings.line_search_gamma << std::endl;
-    os << " line_search_t: " << settings.line_search_t << std::endl;
-    return os;
-}
-
-std::ostream& operator<<(std::ostream& os, const Result& result)
-{
-    os << "InteriorPointQP Result: " << std::endl;
-    if (result.solution.size() < 10)
-    {
-        os << " solution: " << result.solution;
-        os << " dual_solution_v: " << result.dual_solution_v;
-        os << " dual_solution_u: " << result.dual_solution_u;
-        os << " slack_solution_s: " << result.slack_solution_s;
-    }
-    os << " objective: " << result.objective << std::endl;
-    os << " converged: " << result.converged << std::endl;
-    os << " feasible: " << result.feasible << std::endl;
-    os << " num_iteratins: " << result.num_iterations << std::endl;
-    os << " solution_time_sec: " << result.solution_time_sec << " s" << std::endl;
-    return os;
-}
-
 // constructor
 Solver::Solver(
     const Eigen::SparseMatrix<double>& P,
@@ -113,6 +81,12 @@ Result Solver::solve()
 {
     // start timer
     auto timer_init = std::chrono::high_resolution_clock::now();
+
+    // check for early exit (equality constrained)
+    if (G_.rows() == 0)
+    {
+        return solve_equality_constrained();
+    }
 
     // running timer
     double running_timer = 0.0; // init
@@ -192,9 +166,8 @@ Result Solver::solve()
     }
 
     // timing
-    auto timer_final = std::chrono::high_resolution_clock::now();
-    auto duration_final = std::chrono::duration_cast<std::chrono::microseconds>(timer_final - timer_init);
-    double time = 1e-6 * ((double) duration_final.count());
+    const auto timer_final = std::chrono::high_resolution_clock::now();
+    const auto duration_final = std::chrono::duration_cast<std::chrono::microseconds>(timer_final - timer_init);
 
     // assemble results
     Result results;
@@ -206,7 +179,53 @@ Result Solver::solve()
     results.feasible = is_feasible(x_);
     results.converged = !numerical_issue && (k < settings_.max_iterations);
     results.num_iterations = k;
-    results.solution_time_sec = time;
+    results.solution_time_sec = 1e-6 * static_cast<double>(duration_final.count());
+
+    // return
+    return results;
+}
+
+// special case: no inequality constraints
+Result Solver::solve_equality_constrained()
+{
+    // start timer
+    auto timer_init = std::chrono::high_resolution_clock::now();
+
+    // initialize primal and dual vars
+    x_ = Eigen::VectorXd::Zero(n_);
+    v_ = Eigen::VectorXd::Zero(m_eq_);
+    u_.resize(0);
+    s_.resize(0);
+
+    // solve linear system
+    initialize_working_matrices();
+    generate_rhs();
+    lu_solver_.factorize(M0_ + dM_);
+    const bool factorized = lu_status_ == Eigen::ComputationInfo::Success;
+
+    Eigen::VectorXd x_v;
+    if (factorized)
+    {
+        x_v = lu_solver_.solve(bm_);
+        x_ = x_v.segment(0, n_);
+        v_ = x_v.segment(n_, m_eq_);
+    }
+
+    // timing
+    const auto timer_final = std::chrono::high_resolution_clock::now();
+    const auto duration_final = std::chrono::duration_cast<std::chrono::microseconds>(timer_final - timer_init);
+
+    // assemble results
+    Result results;
+    results.solution = x_;
+    results.dual_solution_v = v_;
+    results.dual_solution_u = u_;
+    results.slack_solution_s = s_;
+    results.objective = objective(x_);
+    results.feasible = is_feasible(x_);
+    results.converged = factorized;
+    results.num_iterations = 0;
+    results.solution_time_sec = 1e-6 * static_cast<double>(duration_final.count());
 
     // return
     return results;
@@ -371,8 +390,7 @@ void Solver::remove_linearly_dependent_equality_constraints()
 
     // compute QR decomposition
     Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> qr_solver;
-    qr_solver.analyzePattern(mat_T);
-    qr_solver.factorize(mat_T);
+    qr_solver.compute(mat_T);
 
     // get permutation matrix and its indices
     Eigen::PermutationMatrix<-1, -1> P_full = qr_solver.colsPermutation();
@@ -397,4 +415,36 @@ bool Solver::is_feasible(const Eigen::Ref<const Eigen::VectorXd> x) const
     const bool equality_cons_feasible = m_eq_ > 0 ? (A_*x - b_).cwiseAbs().maxCoeff() < settings_.feasibility_tolerance : true;
     const bool inequality_cons_feasible = m_ineq_ > 0 ? (G_*x - w_).maxCoeff() < settings_.feasibility_tolerance : true;
     return equality_cons_feasible && inequality_cons_feasible;
+}
+
+std::ostream& operator<<(std::ostream& os, const Settings& settings)
+{
+    os << "InteriorPointQP Settings: " << std::endl;
+    os << " max_time_sec: " << settings.max_time_sec << std::endl;
+    os << " barrier_init: " << settings.barrier_init << std::endl;
+    os << " barrier_max: " << settings.barrier_max << std::endl;
+    os << " barrier_terminal: " << settings.barrier_converged << std::endl;
+    os << " feasibility_tolerance: " << settings.feasibility_tolerance << std::endl;
+    os << " max_iterations: " << settings.max_iterations << std::endl;
+    os << " line_search_gamma: " << settings.line_search_gamma << std::endl;
+    os << " line_search_t: " << settings.line_search_t << std::endl;
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const Result& result)
+{
+    os << "InteriorPointQP Result: " << std::endl;
+    if (result.solution.size() < 10)
+    {
+        os << " solution: " << result.solution;
+        os << " dual_solution_v: " << result.dual_solution_v;
+        os << " dual_solution_u: " << result.dual_solution_u;
+        os << " slack_solution_s: " << result.slack_solution_s;
+    }
+    os << " objective: " << result.objective << std::endl;
+    os << " converged: " << result.converged << std::endl;
+    os << " feasible: " << result.feasible << std::endl;
+    os << " num_iteratins: " << result.num_iterations << std::endl;
+    os << " solution_time_sec: " << result.solution_time_sec << " s" << std::endl;
+    return os;
 }

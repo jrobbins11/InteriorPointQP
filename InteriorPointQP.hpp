@@ -23,8 +23,6 @@ struct Settings
     double line_search_gamma = 0.999;
     double line_search_t = 0.9;
     int line_search_max_iterations = 1000;
-
-    friend std::ostream& operator<<(std::ostream& os, const Settings& settings);
 };
 
 struct Result
@@ -38,8 +36,6 @@ struct Result
     bool feasible {};
     int num_iterations {};
     double solution_time_sec {};
-
-    friend std::ostream& operator<<(std::ostream& os, const Result& result);
 };
 
 class Solver
@@ -102,6 +98,11 @@ class Solver
         bool check_problem_dimensions();
         void initialize_working_matrices();
         bool is_feasible(const Eigen::Ref<const Eigen::VectorXd> x) const;
+        Result solve_equality_constrained();
 };
 
 } // end namespace
+
+// printing overloads
+std::ostream& operator<<(std::ostream& os, const InteriorPointQP::Settings& settings);
+std::ostream& operator<<(std::ostream& os, const InteriorPointQP::Result& result);
