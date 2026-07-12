@@ -1,7 +1,6 @@
 # InteriorPointQP
 
-A simple C++ library for solving convex quadratic programs (QPs) using
-Mehrotra's predictor-corrector primal-dual interior point method.
+A simple C++ implementation of Mehrotra's predictor-corrector primal-dual interior point method for quadratic programs.
 
 ## Problem Formulation
 

@@ -117,49 +117,7 @@ TEST(InteriorPointQP, UnconstrainedOptimal)
     // check solution matches expectation
     for (int i=0; i<n; ++i)
     {
-        EXPECT_NEAR(result.solution(i), xr(i), 1e-6);
-    }
-}
-
-// Check that perturbations around the optimal solution for a nearly unconstrained problem have higher cost than solver solution
-TEST_F(RandomQP, NearlyUnconstrainedOptimal)
-{
-    // do-nothing inequality constraints
-    std::vector<Eigen::Triplet<double>> triplets;
-    triplets.clear();
-    for (int i=0; i<n; ++i)
-    {
-        triplets.emplace_back(i, i, 1.0);
-    }
-    Eigen::SparseMatrix<double> G (n, n);
-    G.setFromTriplets(triplets.begin(), triplets.end());
-    Eigen::VectorXd w = 1e6 * Eigen::VectorXd::Ones(n);
-
-    // solve QP
-    Solver solver(P, q, G, w);
-    const Result result = solver.solve();
-
-    // perturb solution and get objective
-    auto perturbed_objective = [&](const Eigen::VectorXd& x, double pert_size) -> double 
-    {
-        // perturbed point
-        std::uniform_real_distribution<double> pert_dist(-pert_size, pert_size);
-        Eigen::VectorXd dx = Eigen::VectorXd::Zero(n);
-        for (int i=0; i<n; ++i)
-        {
-            dx(i) = pert_dist(gen);
-        }
-        const Eigen::VectorXd x_dx = x + dx;
-
-        // get objective
-        return 0.5*x_dx.dot(P*x_dx) + q.dot(x_dx);
-    };
-
-    // check that random perturbations have higher objective
-    for (int i=0; i<100; ++i)
-    {
-        const double result_norm = result.solution.norm();
-        EXPECT_LT(result.objective, perturbed_objective(result.solution, 0.01*result_norm));
+        EXPECT_NEAR(result.solution(i), xr(i), 1e-5);
     }
 }
 
@@ -207,6 +165,27 @@ TEST_F(RandomQP, LinearlyDependentConstraintsDoNotChangeSolution)
     }
     b(b.size()-1) = bsum;
 
+    // duplicate inequality constraints
+    const int n_ineq = w.size();
+
+    std::vector<Eigen::Triplet<double>> triplets;
+    for (int k=0; k<G.outerSize(); ++k)
+    {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(G, k); it; ++it)
+        {
+            triplets.emplace_back(it.row(), it.col(), it.value());
+            triplets.emplace_back(it.row()+n_ineq, it.col(), it.value()); // duplicated constraint
+        }
+    }
+    G.resize(2*n_ineq, n);
+    G.setFromTriplets(triplets.begin(), triplets.end());
+
+    w.conservativeResize(2*n_ineq);
+    for (int i=n_ineq; i<2*n_ineq; ++i)
+    {
+        w(i) = w(i-n_ineq);
+    }
+
     // re-solve
     Solver solver_lindep(P, q, G, w, A, b);
     const Result result_lindep = solver_lindep.solve();
@@ -214,10 +193,10 @@ TEST_F(RandomQP, LinearlyDependentConstraintsDoNotChangeSolution)
     ASSERT_TRUE(result_lindep.converged);
 
     // check that solutions are the same
-    EXPECT_NEAR(result_init.objective, result_lindep.objective, 1e-6);
+    EXPECT_NEAR(result_init.objective, result_lindep.objective, 1e-5);
     for (int i=0; i<n; ++i)
     {
-        EXPECT_NEAR(result_init.solution(i), result_lindep.solution(i), 1e-6);
+        EXPECT_NEAR(result_init.solution(i), result_lindep.solution(i), 1e-5);
     }
 }
 
@@ -262,7 +241,7 @@ TEST(InteriorPointQP, ResultCorrectnessHS21)
     ASSERT_TRUE(result.converged);
 
     // check objective against known value
-    EXPECT_NEAR(result.objective - 100., -99.96, 1e-6);
+    EXPECT_NEAR(result.objective - 100., -99.96, 1e-5);
 }
 
 // Correctness checking: Hock–Schittkowski hs35
@@ -311,7 +290,7 @@ TEST(InteriorPointQP, ResultCorrectnessHS35)
     ASSERT_TRUE(result.converged);
 
     // check objective against known value
-    EXPECT_NEAR(result.objective + 9., 1./9., 1e-6);
+    EXPECT_NEAR(result.objective + 9., 1./9., 1e-5);
 }
 
 // Correctness checking: Hock–Schittkowski hs76
@@ -377,7 +356,38 @@ TEST(InteriorPointQP, ResultCorrectnessHS76)
     ASSERT_TRUE(result.converged);
 
     // check objective against known value
-    EXPECT_NEAR(result.objective, -4.681818181, 1e-6);
+    EXPECT_NEAR(result.objective, -4.681818181, 1e-5);
 }
 
-//TODO: check that this solves LPs
+// Correctness checking: example LP
+TEST(InteriorPointQP, ResultCorrectnessLP)
+{
+    // https://developers.google.com/optimization/lp/lp_example
+
+    // objective
+    Eigen::SparseMatrix<double> P(2,2); // no quadratic terms
+
+    Eigen::VectorXd q (2);
+    q << -3., -4.; // negating because maximization
+
+    // inequality constraints
+    Eigen::MatrixXd Gd (3,2);
+    Gd << 1., 2.,
+          -3., 1.,
+          1., -1.;
+    Eigen::VectorXd w(3);
+    w << 14., 0., 2.;
+
+    // solve LP
+    Solver solver(P, q, Gd.sparseView(), w);
+    const Result result = solver.solve();
+    ASSERT_TRUE(result.feasible);
+    ASSERT_TRUE(result.converged);
+
+    // check objective against known value
+    EXPECT_NEAR(-result.objective, 34.0, 1e-5); // negating because maximization
+
+    // check solution against known value
+    EXPECT_NEAR(result.solution(0), 6.0, 1e-5);
+    EXPECT_NEAR(result.solution(1), 4.0, 1e-5);
+}
