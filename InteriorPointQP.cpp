@@ -135,7 +135,7 @@ Result Solver::solve()
     double mu = compute_mu(s_, u_);
 
     // loop
-    while ((mu > settings_.barrier_converged) && (k < settings_.max_iterations) && 
+    while ((mu > settings_.barrier_converged || !is_feasible(x_)) && (k < settings_.max_iterations) && 
         !numerical_issue && (running_timer < settings_.max_time_sec) && (mu <= settings_.barrier_max))
     {
         // generate system matrix and decompose

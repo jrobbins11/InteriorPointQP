@@ -17,7 +17,7 @@ struct Settings
     double max_time_sec = std::numeric_limits<double>::infinity();
     double barrier_init = 1e6;
     double barrier_converged = 1e-3;
-    double barrier_max = 1e20; // TODO: robustify infeasibility detection
+    double barrier_max = 1e20;
     double feasibility_tolerance = 1e-6;
     int max_iterations = 100;
     double line_search_gamma = 0.999;
@@ -51,6 +51,9 @@ class Solver
         // TODO: document what the variables mean
         // TODO: require P positive semidef
         // TODO: use std::optional
+        // 
+        /// Loops until the barrier parameter is less than barrier_converged and the solution is
+        /// feasible within feasibility_tolerance
         Solver(
             const Eigen::SparseMatrix<double>& P,
             const Eigen::VectorXd& q,
