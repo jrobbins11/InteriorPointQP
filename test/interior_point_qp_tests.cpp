@@ -187,7 +187,37 @@ TEST_F(RandomQP, InfeasibleProblem)
 // Feasible problem with linearly dependent constraints is still feasible with solution unchanged
 TEST_F(RandomQP, LinearlyDependentConstraintsDoNotChangeSolution)
 {
-    //TODO
+    // solve and store result
+    Solver solver_init(P, q, G, w, A, b);
+    const Result result_init = solver_init.solve();
+    ASSERT_TRUE(result_init.feasible);
+    ASSERT_TRUE(result_init.converged);
+
+    // linearly dependent equality constraints
+    const Eigen::MatrixXd Ad = A.toDense();
+    const Eigen::VectorXd Asum = Ad.colwise().sum();
+    const double bsum = b.sum();
+    
+    A.resize(A.rows()+1, A.cols());
+    b.resize(b.size()+1);
+    for (int i=0; i<n; ++i)
+    {
+        A.insert(A.rows()-1, i) = Asum(i);
+    }
+    b(b.size()-1) = bsum;
+
+    // re-solve
+    Solver solver_lindep(P, q, G, w, A, b);
+    const Result result_lindep = solver_lindep.solve();
+    ASSERT_TRUE(result_lindep.feasible);
+    ASSERT_TRUE(result_lindep.converged);
+
+    // check that solutions are the same
+    EXPECT_NEAR(result_init.objective, result_lindep.objective, 1e-2);
+    for (int i=0; i<n; ++i)
+    {
+        EXPECT_NEAR(result_init.solution(i), result_lindep.solution(i), 1e-2);
+    }
 }
 
 // Correctness checking: Hock–Schittkowski hs21
