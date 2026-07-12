@@ -1,8 +1,0 @@
-Checks: >
-  "modernize-*,-modernize-use-trailing-return-type"
-  readability-*,
-  -readability-magic-numbers
-
-WarningsAsErrors: ""
-HeaderFilterRegex: ".*"
-FormatStyle: file

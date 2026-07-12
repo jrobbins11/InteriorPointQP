@@ -16,7 +16,7 @@ namespace
         {
             throw std::invalid_argument("get_triplets: offsets out of range");
         }       
-        for (int i=0; i<mat.outerSize(); i++)
+        for (int i=0; i<mat.outerSize(); ++i)
         {
             for (typename Eigen::SparseMatrix<double>::InnerIterator it(mat,i); it; ++it)
                 triplets.emplace_back(it.row()+row_offset, it.col()+col_offset, it.value());
@@ -30,8 +30,7 @@ namespace
         {
             throw std::invalid_argument("get_triplets: offsets out of range");
         }     
-        int m = d.rows();
-        for (int i=0; i<m; i++)
+        for (int i=0; i<static_cast<int>(d.rows()); ++i)
         {
             triplets.emplace_back(i+row_offset, i+col_offset, d(i));
         }
@@ -374,9 +373,9 @@ double Solver::compute_mu(const Eigen::Ref<const Eigen::VectorXd> s_in, const Ei
 bool Solver::check_problem_dimensions()
 {
     // get dimension variables
-    n_ = P_.rows();
-    m_eq_ = A_.rows();
-    m_ineq_ = G_.rows();
+    n_ = static_cast<int>(P_.rows());
+    m_eq_ = static_cast<int>(A_.rows());
+    m_ineq_ = static_cast<int>(G_.rows());
 
     // check validity
     const bool dims_consistent = n_ == q_.size() && n_ == P_.cols() && n_ == A_.cols() && n_ == G_.cols() 

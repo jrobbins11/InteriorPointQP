@@ -20,7 +20,7 @@ where `P` must be positive semi-definite, `G`/`w` define optional linear inequal
 The solver implements Mehrotra's predictor-corrector interior point method, originally proposed in
 > Mehrotra, Sanjay. "On the implementation of a primal-dual interior point method." SIAM Journal on optimization 2.4 (1992): 575-601.
 
-The specific implementation is based on the presentation in 
+This specific implementation is based on the presentation in 
 > Borrelli, Francesco, Alberto Bemporad, and Manfred Morari. Predictive control for linear and hybrid systems. Cambridge University Press, 2017.
 
 ## Requirements
