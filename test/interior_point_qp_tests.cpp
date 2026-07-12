@@ -30,17 +30,41 @@ protected:
         }
         P.resize(n, n);
         P.setFromTriplets(triplets.begin(), triplets.end());
+
+        // Add box constraints
+        triplets.clear();
+        for (int i=0; i<n; ++i)
+        {
+            triplets.emplace_back(i, i, 1.0);
+            triplets.emplace_back(i+n, i, -1.0);
+        }
+        G.resize(2*n, n);
+        G.setFromTriplets(triplets.begin(), triplets.end());
+        w = bound * Eigen::VectorXd::Ones(2*n);
+
+        // Add some equality constraints
+        n_eq = n/4;
+        triplets.clear();
+        for (int i=0; i<n_eq; ++i)
+        {
+            triplets.emplace_back(i, i, 1.0);
+        }
+        A.resize(n_eq, n);
+        A.setFromTriplets(triplets.begin(), triplets.end());
+        b = 0.99 * bound * Eigen::VectorXd::Ones(n_eq);
     }
 
     void TearDown() override
     {
     }
 
+    const double bound = 10.;
     std::mt19937 gen {42};
     std::uniform_real_distribution<double> distr;
     const int n = 50;
-    Eigen::SparseMatrix<double> P;
-    Eigen::VectorXd q;
+    int n_eq;
+    Eigen::SparseMatrix<double> P, G, A;
+    Eigen::VectorXd q, w, b;
 };
 
 // Test that problem dimension checking works
@@ -61,6 +85,39 @@ TEST(InteriorPointQP, InvalidProblemDimensions)
                         Eigen::VectorXd::Zero(5),
                         Eigen::SparseMatrix<double>(3, 5),
                         Eigen::VectorXd::Zero(3)));
+}
+
+// Unconstrained produces optimal solution
+TEST(InteriorPointQP, UnconstrainedOptimal)
+{
+    // Problem: min 0.5 * (x-xr)^T (x-xr) -> solution is xr
+    // q = xr
+
+    // random xr
+    std::mt19937 gen (42);
+    std::uniform_real_distribution<double> distr(1., 10.);
+    const int n = 50;
+    std::vector<Eigen::Triplet<double>> triplets;
+    Eigen::VectorXd q = Eigen::VectorXd::Zero(n);
+    for (int i=0; i<n; ++i) 
+    {
+        triplets.emplace_back(i, i, 1.0);
+        q(i) = distr(gen);
+    }
+    Eigen::SparseMatrix<double> P (n, n);
+    P.setFromTriplets(triplets.begin(), triplets.end());
+
+    // solve QP
+    Solver solver(P, q);
+    const Result result = solver.solve();
+    ASSERT_TRUE(result.converged);
+    ASSERT_TRUE(result.feasible);
+
+    // check solution matches expectation
+    for (int i=0; i<n; ++i)
+    {
+        EXPECT_NEAR(result.solution(i), q(i), 1e-6);
+    }
 }
 
 // Check that perturbations around the optimal solution for a nearly unconstrained problem have higher cost than solver solution
@@ -105,66 +162,21 @@ TEST_F(RandomQP, NearlyUnconstrainedOptimal)
     }
 }
 
-// Unconstrained produces optimal solution
-TEST(InteriorPointQP, UnconstrainedOptimal)
+// Feasible equality-constrained problem produces feasible solution
+TEST_F(RandomQP, FeasibleProblem)
 {
-    // Problem: min 0.5 * (x-xr)^T (x-xr) -> solution is xr
-    // q = xr
-
-    // random xr
-    std::mt19937 gen (42);
-    std::uniform_real_distribution<double> distr(1., 10.);
-    const int n = 50;
-    std::vector<Eigen::Triplet<double>> triplets;
-    Eigen::VectorXd q = Eigen::VectorXd::Zero(n);
-    for (int i=0; i<n; ++i) 
-    {
-        triplets.emplace_back(i, i, 1.0);
-        q(i) = distr(gen);
-    }
-    Eigen::SparseMatrix<double> P (n, n);
-    P.setFromTriplets(triplets.begin(), triplets.end());
-
-    // solve QP
-    Solver solver(P, q);
+    // solve QP, check infeasible
+    Solver solver(P, q, G, w, A, b);
     const Result result = solver.solve();
-    ASSERT_TRUE(result.converged);
-    ASSERT_TRUE(result.feasible);
-
-    // check solution matches expectation
-    for (int i=0; i<n; ++i)
-    {
-        EXPECT_NEAR(result.solution(i), q(i), 1e-6);
-    }
+    EXPECT_TRUE(result.feasible);
+    EXPECT_TRUE(result.converged);
 }
 
 // Infeasible problem produces infeasible solution
 TEST_F(RandomQP, InfeasibleProblem)
 {
-    const double bound = 10.;
-
-    // Add box constraints
-    std::vector<Eigen::Triplet<double>> triplets;
-    triplets.clear();
-    for (int i=0; i<n; ++i)
-    {
-        triplets.emplace_back(i, i, 1.0);
-        triplets.emplace_back(i+n, i, -1.0);
-    }
-    Eigen::SparseMatrix<double> G (2*n, n);
-    G.setFromTriplets(triplets.begin(), triplets.end());
-    Eigen::VectorXd w = bound * Eigen::VectorXd::Ones(2*n);
-
-    // Add some incompatible equality constraints
-    const int n_eq = n/4;
-    triplets.clear();
-    for (int i=0; i<n_eq; ++i)
-    {
-        triplets.emplace_back(i, i, 1.0);
-    }
-    Eigen::SparseMatrix<double> A (n_eq, n);
-    A.setFromTriplets(triplets.begin(), triplets.end());
-    Eigen::VectorXd b = 1.01 * bound * Eigen::VectorXd::Ones(n_eq);
+    // Modify equality constraints to violate bound
+    b = 1.01 * bound * Eigen::VectorXd::Ones(n_eq);
 
     // solve QP, check infeasible
     Solver solver(P, q, G, w, A, b);
@@ -172,39 +184,10 @@ TEST_F(RandomQP, InfeasibleProblem)
     EXPECT_FALSE(result.feasible);
 }
 
-// Feasible equality-constrained problem produces feasible solution
-TEST_F(RandomQP, FeasibleProblem)
+// Feasible problem with linearly dependent constraints is still feasible with solution unchanged
+TEST_F(RandomQP, LinearlyDependentConstraintsDoNotChangeSolution)
 {
-    const double bound = 10.;
-
-    // Add box constraints
-    std::vector<Eigen::Triplet<double>> triplets;
-    triplets.clear();
-    for (int i=0; i<n; ++i)
-    {
-        triplets.emplace_back(i, i, 1.0);
-        triplets.emplace_back(i+n, i, -1.0);
-    }
-    Eigen::SparseMatrix<double> G (2*n, n);
-    G.setFromTriplets(triplets.begin(), triplets.end());
-    Eigen::VectorXd w = bound * Eigen::VectorXd::Ones(2*n);
-
-    // Add some incompatible equality constraints
-    const int n_eq = n/4;
-    triplets.clear();
-    for (int i=0; i<n_eq; ++i)
-    {
-        triplets.emplace_back(i, i, 1.0);
-    }
-    Eigen::SparseMatrix<double> A (n_eq, n);
-    A.setFromTriplets(triplets.begin(), triplets.end());
-    Eigen::VectorXd b = 0.99 * bound * Eigen::VectorXd::Ones(n_eq);
-
-    // solve QP, check infeasible
-    Solver solver(P, q, G, w, A, b);
-    const Result result = solver.solve();
-    EXPECT_TRUE(result.feasible);
-    EXPECT_TRUE(result.converged);
+    //TODO
 }
 
 // Correctness checking: Hock–Schittkowski hs21
@@ -365,5 +348,3 @@ TEST(InteriorPointQP, ResultCorrectnessHS76)
     // check objective against known value
     EXPECT_NEAR(result.objective, -4.681818181, 1e-2);
 }
-
-// TODO: Equality constraints not linearly independent
