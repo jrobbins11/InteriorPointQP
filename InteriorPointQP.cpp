@@ -47,7 +47,7 @@ std::ostream& operator<<(std::ostream& os, const Settings& settings)
     os << " max_time_sec: " << settings.max_time_sec << std::endl;
     os << " barrier_init: " << settings.barrier_init << std::endl;
     os << " barrier_max: " << settings.barrier_max << std::endl;
-    os << " barrier_terminal: " << settings.barrier_terminal << std::endl;
+    os << " barrier_terminal: " << settings.barrier_converged << std::endl;
     os << " feasibility_tolerance: " << settings.feasibility_tolerance << std::endl;
     os << " max_iterations: " << settings.max_iterations << std::endl;
     os << " line_search_gamma: " << settings.line_search_gamma << std::endl;
@@ -135,7 +135,7 @@ Result Solver::solve()
     double mu = compute_mu(s_, u_);
 
     // loop
-    while ((mu > settings_.barrier_terminal) && (k < settings_.max_iterations) && 
+    while ((mu > settings_.barrier_converged) && (k < settings_.max_iterations) && 
         !numerical_issue && (running_timer < settings_.max_time_sec) && (mu <= settings_.barrier_max))
     {
         // generate system matrix and decompose

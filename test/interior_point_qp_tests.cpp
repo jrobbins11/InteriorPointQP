@@ -198,8 +198,8 @@ TEST_F(RandomQP, LinearlyDependentConstraintsDoNotChangeSolution)
     const Eigen::VectorXd Asum = Ad.colwise().sum();
     const double bsum = b.sum();
     
-    A.resize(A.rows()+1, A.cols());
-    b.resize(b.size()+1);
+    A.conservativeResize(A.rows()+1, A.cols());
+    b.conservativeResize(b.size()+1);
     for (int i=0; i<n; ++i)
     {
         A.insert(A.rows()-1, i) = Asum(i);
