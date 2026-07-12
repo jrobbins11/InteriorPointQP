@@ -98,17 +98,17 @@ TEST(InteriorPointQP, UnconstrainedOptimal)
     std::uniform_real_distribution<double> distr(1., 10.);
     const int n = 50;
     std::vector<Eigen::Triplet<double>> triplets;
-    Eigen::VectorXd q = Eigen::VectorXd::Zero(n);
+    Eigen::VectorXd xr = Eigen::VectorXd::Zero(n);
     for (int i=0; i<n; ++i) 
     {
         triplets.emplace_back(i, i, 1.0);
-        q(i) = distr(gen);
+        xr(i) = distr(gen);
     }
     Eigen::SparseMatrix<double> P (n, n);
     P.setFromTriplets(triplets.begin(), triplets.end());
 
     // solve QP
-    Solver solver(P, q);
+    Solver solver(P, -xr);
     const Result result = solver.solve();
     ASSERT_TRUE(result.converged);
     ASSERT_TRUE(result.feasible);
@@ -116,7 +116,7 @@ TEST(InteriorPointQP, UnconstrainedOptimal)
     // check solution matches expectation
     for (int i=0; i<n; ++i)
     {
-        EXPECT_NEAR(result.solution(i), q(i), 1e-6);
+        EXPECT_NEAR(result.solution(i), xr(i), 1e-6);
     }
 }
 
