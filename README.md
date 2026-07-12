@@ -2,6 +2,8 @@
 
 A simple C++ implementation of Mehrotra's predictor-corrector primal-dual interior point method for quadratic programs.
 
+[![C++ build](https://github.com/jrobbins11/InteriorPointQP/actions/workflows/cpp_build.yml/badge.svg)](https://github.com/jrobbins11/InteriorPointQP/actions/workflows/cpp_build.yml)
+
 ## Problem Formulation
 
 `InteriorPointQP::Solver` solves quadratic programs of the form:

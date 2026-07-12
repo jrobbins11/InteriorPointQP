@@ -8,8 +8,6 @@
 #include <stdexcept>
 #include <random>
 
-#include <iostream>
-
 using namespace InteriorPointQP;
 
 // test fixture
