@@ -207,10 +207,163 @@ TEST_F(RandomQP, FeasibleProblem)
     EXPECT_TRUE(result.converged);
 }
 
-// Known QP solution
-TEST(InteriorPointQP, ResultCorrectness)
+// Correctness checking: Hock–Schittkowski hs21
+TEST(InteriorPointQP, ResultCorrectnessHS21)
 {
-    //TODO
+    // https://apmonitor.com/wiki/uploads/Apps/hs021.apm
+
+    // objective
+    Eigen::SparseMatrix<double> P (2,2);
+    P.insert(0, 0) = 1./100.;
+    P.insert(1, 1) = 1.;
+    P *= 2.; // correcting for 1/2 factor
+
+    Eigen::VectorXd q = Eigen::VectorXd::Zero(2);
+
+    // inequality constraints
+    Eigen::SparseMatrix<double> G (5, 2);
+    Eigen::VectorXd w (5);
+
+    // 10 x0 - x1 >= 10
+    G.insert(0, 0) = -10.;
+    G.insert(0, 1) = 1.;
+    w(0) = -10.;
+
+    // 2 <= x0 <= 50
+    G.insert(1, 0) = -1.;
+    w(1) = -2.;
+    G.insert(2, 0) = 1.;
+    w(2) = 50.;
+
+    // -50 <= x1 <= 50
+    G.insert(3, 1) = -1.;
+    w(3) = 50.;
+    G.insert(4, 1) = 1.;
+    w(4) = 50.;
+
+    // solve QP
+    Solver solver(P, q, G, w);
+    const Result result = solver.solve();
+    ASSERT_TRUE(result.feasible);
+    ASSERT_TRUE(result.converged);
+
+    // check objective against known value
+    EXPECT_NEAR(result.objective - 100., -99.96, 1e-2);
+}
+
+// Correctness checking: Hock–Schittkowski hs35
+TEST(InteriorPointQP, ResultCorrectnessHS35)
+{
+    // https://apmonitor.com/wiki/uploads/Apps/hs035.apm
+
+    // objective
+    Eigen::SparseMatrix<double> P (3,3);
+    P.insert(0,0) = 2.;
+    P.insert(1,1) = 2.;
+    P.insert(2,2) = 1.;
+    P.insert(0, 1) = 1.;
+    P.insert(1, 0) = 1.;
+    P.insert(0, 2) = 1.;
+    P.insert(2, 0) = 1.;
+    P *= 2.; // correcting for 1/2 factor
+
+    Eigen::VectorXd q (3);
+    q(0) = -8.;
+    q(1) = -6.;
+    q(2) = -4.;
+
+    // inequality constraints
+    Eigen::SparseMatrix<double> G(4, 3);
+    Eigen::VectorXd w(4);
+
+    // all variables >= 0
+    G.insert(0,0) = -1.;
+    w(0) = 0.;
+    G.insert(1,1) = -1.;
+    w(1) = 0.;
+    G.insert(2,2) = -1.;
+    w(2) = 0.;
+
+    // x0 + x1 + 2x2 <= 3
+    G.insert(3,0) = 1.;
+    G.insert(3,1) = 1.;
+    G.insert(3,2) = 2.;
+    w(3) = 3.;
+
+    // solve QP
+    Solver solver(P, q, G, w);
+    const Result result = solver.solve();
+    ASSERT_TRUE(result.feasible);
+    ASSERT_TRUE(result.converged);
+
+    // check objective against known value
+    EXPECT_NEAR(result.objective + 9., 1./9., 1e-2);
+}
+
+// Correctness checking: Hock–Schittkowski hs76
+TEST(InteriorPointQP, ResultCorrectnessHS76)
+{
+    // https://apmonitor.com/wiki/uploads/Apps/hs076.apm
+
+    // objective
+    Eigen::SparseMatrix<double> P (4,4);
+    P.insert(0,0) = 1.;
+    P.insert(1,1) = 0.5;
+    P.insert(2,2) = 1.;
+    P.insert(3,3) = 0.5;
+    P.insert(0,2) = -0.5;
+    P.insert(2,0) = -0.5;
+    P.insert(2,3) = 0.5;
+    P.insert(3,2) = 0.5;
+    P *= 2.; // correcting for 1/2 factor
+
+    Eigen::VectorXd q (4);
+    q(0) = -1.;
+    q(1) = -3.;
+    q(2) = 1.;
+    q(3) = -1.;
+
+    // inequality constraints
+    Eigen::SparseMatrix<double> G (7, 4);
+    Eigen::VectorXd w (7);
+
+    // all variables >= 0
+    G.insert(0,0) = -1.;
+    w(0) = 0.;
+    G.insert(1,1) = -1.;
+    w(1) = 0.;
+    G.insert(2,2) = -1.;
+    w(2) = 0.;
+    G.insert(3,3) = -1.;
+    w(3) = 0.;
+
+    // x0 + 2x1 + x2 + x3 <= 5
+    G.insert(4,0) = 1.;
+    G.insert(4,1) = 2.;
+    G.insert(4,2) = 1.;
+    G.insert(4,3) = 1.;
+    w(4) = 5.;
+
+    // 3x0 + x1 + 2x2 - x3 <= 4
+    G.insert(5,0) = 3.;
+    G.insert(5,1) = 1.;
+    G.insert(5,2) = 2.;
+    G.insert(5,3) = -1.;
+    w(5) = 4.;
+
+    // x1 + 4x2 >= 1.5
+    G.insert(6,1) = -1.;
+    G.insert(6,2) = -4.;
+    w(6) = -1.5;
+
+    // solve QP
+    Solver solver(P, q, G, w);
+    const Result result = solver.solve();
+    ASSERT_TRUE(result.feasible);
+    ASSERT_TRUE(result.converged);
+
+    // check objective against known value
+    EXPECT_NEAR(result.objective, -4.681818181, 1e-2);
 }
 
 // TODO: Equality constraints not linearly independent

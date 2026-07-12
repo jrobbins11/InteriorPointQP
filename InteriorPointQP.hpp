@@ -50,6 +50,7 @@ class Solver
         // TODO: handle unconstrained problems
         // TODO: document what the variables mean
         // TODO: require P positive semidef
+        // TODO: use std::optional
         Solver(
             const Eigen::SparseMatrix<double>& P,
             const Eigen::VectorXd& q,
