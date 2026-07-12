@@ -43,23 +43,23 @@ namespace
 
 // constructor
 Solver::Solver(
-    const Eigen::SparseMatrix<double>& P,
-    const Eigen::VectorXd& q,
-    const Eigen::SparseMatrix<double>& G,
-    const Eigen::VectorXd& w,
-    const Eigen::SparseMatrix<double>& A,
-    const Eigen::VectorXd& b,
-    const Settings& settings 
+    Eigen::SparseMatrix<double> P,
+    Eigen::VectorXd q,
+    std::optional<Eigen::SparseMatrix<double>> G,
+    std::optional<Eigen::VectorXd> w,
+    std::optional<Eigen::SparseMatrix<double>> A,
+    std::optional<Eigen::VectorXd> b,
+    std::optional<Settings> settings    
 )
 {    
     // copy in data, check for default-constructed arguments
     P_ = P;
     q_ = q;
-    G_ = (G.rows() == 0) ? Eigen::SparseMatrix<double>(0, q.size()) : G;
-    w_ = w;
-    A_ = (A.rows() == 0) ? Eigen::SparseMatrix<double>(0, q.size()) : A;
-    b_ = b;
-    settings_ = settings;    
+    G_ = G.has_value() ? G.value() : Eigen::SparseMatrix<double>(0, q.size());
+    w_ = w.has_value() ? w.value() : Eigen::VectorXd::Zero(0);
+    A_ = A.has_value() ? A.value() : Eigen::SparseMatrix<double>(0, q.size());
+    b_ = b.has_value() ? b.value() : Eigen::VectorXd::Zero(0);
+    settings_ = settings.has_value() ? settings.value() : Settings{};    
 
     // preprocessing (make sure A is full rank)
     remove_linearly_dependent_equality_constraints();

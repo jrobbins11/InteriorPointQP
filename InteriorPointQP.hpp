@@ -4,10 +4,10 @@
 #include "Eigen/Sparse"
 
 #include <ostream>
-#include <vector>
 #include <cmath>
 #include <utility>
 #include <limits>
+#include <optional>
 
 namespace InteriorPointQP
 {
@@ -51,13 +51,13 @@ class Solver
         /// Loops until the barrier parameter is less than barrier_converged and the solution is
         /// feasible within feasibility_tolerance
         Solver(
-            const Eigen::SparseMatrix<double>& P,
-            const Eigen::VectorXd& q,
-            const Eigen::SparseMatrix<double>& G = Eigen::SparseMatrix<double>{},
-            const Eigen::VectorXd& w = Eigen::VectorXd{},
-            const Eigen::SparseMatrix<double>& A = Eigen::SparseMatrix<double>{},
-            const Eigen::VectorXd& b = Eigen::VectorXd{},
-            const Settings& settings = Settings{}    
+            Eigen::SparseMatrix<double> P,
+            Eigen::VectorXd q,
+            std::optional<Eigen::SparseMatrix<double>> G = std::nullopt,
+            std::optional<Eigen::VectorXd> w = std::nullopt,
+            std::optional<Eigen::SparseMatrix<double>> A = std::nullopt,
+            std::optional<Eigen::VectorXd> b = std::nullopt,
+            std::optional<Settings> settings = std::nullopt    
         );
 
         // solve method
