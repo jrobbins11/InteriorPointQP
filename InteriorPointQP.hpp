@@ -12,44 +12,92 @@
 namespace InteriorPointQP
 {
 
+/**
+ * @brief Settings structure for QP solver
+ * 
+ */
 struct Settings
 {
+    /// max computation time in seconds
     double max_time_sec = std::numeric_limits<double>::infinity();
+
+    /// initial barrier parameter
     double barrier_init = 1e6;
+
+    /// barrier parameter value below which the solver is determined to be converged
     double barrier_converged = 1e-6;
+    
+    /// barrier parameter value above which the problem is determined to be infeasible 
     double barrier_max = 1e20;
+
+    /// tolerance for determining that a solution satisfies constraints
     double feasibility_tolerance = 1e-6;
+
+    /// maximum number of interior point iterations
     int max_iterations = 100;
-    double line_search_gamma = 0.999;
-    double line_search_t = 0.9;
+
+    /// step size scaling, must be less in (0, 1)
+    double step_scaling = 0.999;
+
+    /// line search step size reduces by this factor at every iteration, must be in (0, 1)
+    double line_search_step_factor = 0.9;
+
+    /// max iterations for line search
     int line_search_max_iterations = 1000;
 };
 
+/**
+ * @brief Solution structure for QP solver
+ * 
+ */
 struct Result
 {
+    /// solution vector x
     Eigen::VectorXd solution {};
+
+    /// dual solution vector v
     Eigen::VectorXd dual_solution_v {};
+
+    /// dual solution vector u
     Eigen::VectorXd dual_solution_u {};
+    
+    /// slack variable solution vector s
     Eigen::VectorXd slack_solution_s {};
+
+    /// objective function value (1/2)*x^T*P*x + q^T*x
     double objective {};
+
+    /// convergence flag, true if optimization converged
     bool converged {};
+
+    /// feasibility flag, true if solution x is feasible within feasibility tolerance
     bool feasible {};
+
+    /// number of interior point iterations to get solution
     int num_iterations {};
+
+    /// total solution time in seconds
     double solution_time_sec {};
 };
 
+/**
+ * @brief Class to solve the quadratic program (1/2)*x^T*P*x + q^T*x s.t. G*x <= w and A*x = b using Mehrotra's primal-dual interior point method
+ * 
+ */
 class Solver
 {
     public:
 
-        // constructor
-        // TODO: handle unconstrained problems
-        // TODO: document what the variables mean
-        // TODO: require P positive semidef
-        // TODO: use std::optional
-        // 
-        /// Loops until the barrier parameter is less than barrier_converged and the solution is
-        /// feasible within feasibility_tolerance
+        /** 
+         * @brief Construct Solver object
+         * @param P quadratic cost matrix, must be positive semi-definite
+         * @param q linear cost vector
+         * @param G inequality constraint matrix (optional)
+         * @param w inequality constraint vector (optional)
+         * @param A equality constraint matrix (optional)
+         * @param b equality constraint vector (optional)
+         * @throws std::invalid_argument if problem dimensions are inconsistent or settings are invalid
+         */ 
         Solver(
             Eigen::SparseMatrix<double> P,
             Eigen::VectorXd q,
@@ -60,11 +108,27 @@ class Solver
             std::optional<Settings> settings = std::nullopt    
         );
 
-        // solve method
+        /**
+         * @brief Solve quadratic program (1/2)*x^T*P*x + q^T*x s.t. G*x <= w and A*x = b.
+         * @return Result structure
+         */
         Result solve();
 
-        // update methods
+        /**
+         * @brief Update settings structure
+         * 
+         * @param settings updated settings structure
+         * @throw std::invalid_argument if settings are not valid
+         */
         void update_settings(const Settings& settings);
+
+        /**
+         * @brief Check that problem settings are valid
+         * 
+         * @param settings settings structure
+         * @return true if settings are valid
+         */
+        bool validate_settings(const Settings& settings) const;
 
     private:
 

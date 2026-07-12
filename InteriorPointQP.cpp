@@ -69,10 +69,18 @@ Solver::Solver(
     {
         throw std::invalid_argument("Inconsistent problem dimensions");
     }
+    if (!validate_settings(settings_))
+    {
+        throw std::invalid_argument("Settings invalid.");
+    }
 }
 
 void Solver::update_settings(const Settings& settings) 
 {
+    if (!validate_settings(settings))
+    {
+        throw std::invalid_argument("Settings invalid.");
+    }
     settings_ = settings;
 }
 
@@ -148,10 +156,10 @@ Result Solver::solve()
         numerical_issue |= no_progress_corr;
 
         // update
-        x_ += settings_.line_search_gamma*h_corr*del_x_corr;
-        v_ += settings_.line_search_gamma*h_corr*del_v_corr;
-        u_ += settings_.line_search_gamma*h_corr*del_u_corr;
-        s_ += settings_.line_search_gamma*h_corr*del_s_corr;
+        x_ += settings_.step_scaling*h_corr*del_x_corr;
+        v_ += settings_.step_scaling*h_corr*del_v_corr;
+        u_ += settings_.step_scaling*h_corr*del_u_corr;
+        s_ += settings_.step_scaling*h_corr*del_s_corr;
 
         // update running timer
         auto timer_running = std::chrono::high_resolution_clock::now();
@@ -344,7 +352,7 @@ std::pair<double, bool> Solver::line_search(const Eigen::Ref<const Eigen::Vector
         if ((s_ds.minCoeff() > 0) && (u_du.minCoeff() > 0))
             valid = true;
         else
-            h = settings_.line_search_t*h;
+            h = settings_.line_search_step_factor*h;
 
         // increment
         ++cnt;
@@ -417,6 +425,23 @@ bool Solver::is_feasible(const Eigen::Ref<const Eigen::VectorXd> x) const
     return equality_cons_feasible && inequality_cons_feasible;
 }
 
+bool Solver::validate_settings(const Settings& settings) const
+{
+    const bool time_valid = settings.max_time_sec > 0.;
+    const bool barrier_valid = settings.barrier_init > 0. &&
+                               settings.barrier_converged > 0. &&
+                               settings.barrier_max > 0. &&
+                               settings.barrier_converged < settings.barrier_init &&
+                               settings.barrier_init < settings.barrier_max;
+    const bool tol_valid = settings.feasibility_tolerance > 0.;
+    const bool iterations_valid = settings.max_iterations > 0;
+    const bool step_valid = settings.step_scaling > 0. && settings.step_scaling < 1.;
+    const bool line_search_valid = settings.line_search_step_factor > 0. &&
+                                   settings.line_search_step_factor < 1. &&
+                                   settings.line_search_max_iterations > 0;
+    return time_valid && barrier_valid && tol_valid && iterations_valid && step_valid && line_search_valid;
+}
+
 std::ostream& operator<<(std::ostream& os, const Settings& settings)
 {
     os << "InteriorPointQP Settings: " << std::endl;
@@ -426,8 +451,9 @@ std::ostream& operator<<(std::ostream& os, const Settings& settings)
     os << " barrier_terminal: " << settings.barrier_converged << std::endl;
     os << " feasibility_tolerance: " << settings.feasibility_tolerance << std::endl;
     os << " max_iterations: " << settings.max_iterations << std::endl;
-    os << " line_search_gamma: " << settings.line_search_gamma << std::endl;
-    os << " line_search_t: " << settings.line_search_t << std::endl;
+    os << " step_scaling: " << settings.step_scaling << std::endl;
+    os << " line_search_step_factor: " << settings.line_search_step_factor << std::endl;
+    os << " line_search_max_iterations: " << settings.line_search_max_iterations << std::endl;
     return os;
 }
 
