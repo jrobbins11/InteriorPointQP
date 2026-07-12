@@ -444,7 +444,7 @@ std::ostream& operator<<(std::ostream& os, const Result& result)
     os << " objective: " << result.objective << std::endl;
     os << " converged: " << result.converged << std::endl;
     os << " feasible: " << result.feasible << std::endl;
-    os << " num_iteratins: " << result.num_iterations << std::endl;
+    os << " num_iterations: " << result.num_iterations << std::endl;
     os << " solution_time_sec: " << result.solution_time_sec << " s" << std::endl;
     return os;
 }

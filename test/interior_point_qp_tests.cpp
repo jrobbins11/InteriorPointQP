@@ -7,6 +7,7 @@
 
 #include <stdexcept>
 #include <random>
+
 #include <iostream>
 
 using namespace InteriorPointQP;
@@ -213,10 +214,10 @@ TEST_F(RandomQP, LinearlyDependentConstraintsDoNotChangeSolution)
     ASSERT_TRUE(result_lindep.converged);
 
     // check that solutions are the same
-    EXPECT_NEAR(result_init.objective, result_lindep.objective, 1e-2);
+    EXPECT_NEAR(result_init.objective, result_lindep.objective, 1e-6);
     for (int i=0; i<n; ++i)
     {
-        EXPECT_NEAR(result_init.solution(i), result_lindep.solution(i), 1e-2);
+        EXPECT_NEAR(result_init.solution(i), result_lindep.solution(i), 1e-6);
     }
 }
 
@@ -261,7 +262,7 @@ TEST(InteriorPointQP, ResultCorrectnessHS21)
     ASSERT_TRUE(result.converged);
 
     // check objective against known value
-    EXPECT_NEAR(result.objective - 100., -99.96, 1e-2);
+    EXPECT_NEAR(result.objective - 100., -99.96, 1e-6);
 }
 
 // Correctness checking: Hock–Schittkowski hs35
@@ -310,7 +311,7 @@ TEST(InteriorPointQP, ResultCorrectnessHS35)
     ASSERT_TRUE(result.converged);
 
     // check objective against known value
-    EXPECT_NEAR(result.objective + 9., 1./9., 1e-2);
+    EXPECT_NEAR(result.objective + 9., 1./9., 1e-6);
 }
 
 // Correctness checking: Hock–Schittkowski hs76
@@ -376,7 +377,7 @@ TEST(InteriorPointQP, ResultCorrectnessHS76)
     ASSERT_TRUE(result.converged);
 
     // check objective against known value
-    EXPECT_NEAR(result.objective, -4.681818181, 1e-2);
+    EXPECT_NEAR(result.objective, -4.681818181, 1e-6);
 }
 
 //TODO: check that this solves LPs

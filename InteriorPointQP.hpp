@@ -16,7 +16,7 @@ struct Settings
 {
     double max_time_sec = std::numeric_limits<double>::infinity();
     double barrier_init = 1e6;
-    double barrier_converged = 1e-3;
+    double barrier_converged = 1e-6;
     double barrier_max = 1e20;
     double feasibility_tolerance = 1e-6;
     int max_iterations = 100;
