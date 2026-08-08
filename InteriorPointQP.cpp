@@ -72,6 +72,9 @@ Solver::Solver(
     {
         throw std::invalid_argument("Settings invalid.");
     }
+
+    // build the parts of the linear system that do not change between solves
+    initialize_working_matrices();
 }
 
 void Solver::update_settings(const Settings& settings) 
@@ -104,9 +107,6 @@ Result Solver::solve()
     v_ = Eigen::VectorXd::Zero(m_eq_);
     u_ = zeta*Eigen::VectorXd::Ones(m_ineq_);
     s_ = zeta*Eigen::VectorXd::Ones(m_ineq_);
-
-    // initialize working matrices
-    initialize_working_matrices();
 
     // outer loop init
     int k = 0;
@@ -205,7 +205,6 @@ Result Solver::solve_equality_constrained()
     s_.resize(0);
 
     // solve linear system
-    initialize_working_matrices();
     generate_rhs();
     lu_solver_.factorize(M0_ + dM_);
     const bool factorized = lu_status_ == Eigen::ComputationInfo::Success;
@@ -245,6 +244,7 @@ double Solver::objective(const Eigen::Ref<const Eigen::VectorXd> x_in)
 }
 
 // initialize working matrices
+// only depends on the problem data, so this runs once at construction rather than per solve
 void Solver::initialize_working_matrices()
 {
     // precompute transposes
@@ -275,10 +275,11 @@ void Solver::initialize_working_matrices()
     M0_.setFromTriplets(triplets.begin(), triplets.end());
 
     // initialize dM
+    // values are placeholders establishing the S / Z sparsity pattern, generate_system_matrix overwrites them with s_ and u_
     triplets.clear();
     dM_.resize(n_ + m_eq_ + 2*m_ineq_, n_ + m_eq_ + 2*m_ineq_);
-    get_triplets_diagonal(s_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_);
-    get_triplets_diagonal(u_, triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_ + m_ineq_);
+    get_triplets_diagonal(Eigen::VectorXd::Ones(m_ineq_), triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_);
+    get_triplets_diagonal(Eigen::VectorXd::Ones(m_ineq_), triplets, n_ + m_eq_ + m_ineq_, n_ + m_eq_ + m_ineq_);
     dM_.setFromTriplets(triplets.begin(), triplets.end());
 
     // analyze pattern
